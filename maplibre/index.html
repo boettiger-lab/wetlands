@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wetlands Map</title>
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="menu">
+        <div class="menu-section">
+            <label class="section-title">Base Map</label>
+            <div class="radio-group">
+                <label>
+                    <input type="radio" name="basemap" value="dataviz" checked>
+                    <span>Dataviz</span>
+                </label>
+                <label>
+                    <input type="radio" name="basemap" value="dark">
+                    <span>Dark</span>
+                </label>
+            </div>
+        </div>
+        <div class="menu-section">
+            <label class="section-title">Overlays</label>
+            <div class="checkbox-group">
+                <label>
+                    <input id="wetlands-layer" type="checkbox" name="rtoggle" value="wetlands" checked="checked">
+                    <span>Global Wetlands</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="legend">
+        <div id="legend-header">
+            <h3>GLWD Wetland Classes</h3>
+            <button id="legend-toggle">−</button>
+        </div>
+        <div id="legend-content">
+            <div class="legend-section">
+                <h4>Open Water</h4>
+                <div class="legend-item"><span style="background: rgb(0, 112, 255)"></span>Freshwater lake</div>
+                <div class="legend-item"><span style="background: rgb(0, 197, 255)"></span>Saline lake</div>
+                <div class="legend-item"><span style="background: rgb(0, 92, 230)"></span>Reservoir</div>
+                <div class="legend-item"><span style="background: rgb(0, 38, 115)"></span>Large river</div>
+                <div class="legend-item"><span style="background: rgb(83, 115, 115)"></span>Large estuarine river</div>
+                <div class="legend-item"><span style="background: rgb(156, 156, 156)"></span>Other permanent waterbody
+                </div>
+                <div class="legend-item"><span style="background: rgb(115, 178, 255)"></span>Small streams</div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Lacustrine Wetlands</h4>
+                <div class="legend-item"><span style="background: rgb(38, 115, 0)"></span>Lacustrine, forested</div>
+                <div class="legend-item"><span style="background: rgb(163, 255, 115)"></span>Lacustrine, non-forested
+                </div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Riverine Wetlands</h4>
+                <div class="legend-item"><span style="background: rgb(0, 168, 132)"></span>Regularly flooded, forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(163, 255, 184)"></span>Regularly flooded,
+                    non-forested</div>
+                <div class="legend-item"><span style="background: rgb(76, 115, 0)"></span>Seasonally flooded, forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(204, 242, 77)"></span>Seasonally flooded,
+                    non-forested</div>
+                <div class="legend-item"><span style="background: rgb(0, 100, 0)"></span>Seasonally saturated, forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(178, 178, 178)"></span>Seasonally saturated,
+                    non-forested</div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Palustrine Wetlands</h4>
+                <div class="legend-item"><span style="background: rgb(115, 76, 0)"></span>Regularly flooded, forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(230, 152, 0)"></span>Regularly flooded,
+                    non-forested</div>
+                <div class="legend-item"><span style="background: rgb(115, 115, 0)"></span>Seasonally saturated,
+                    forested</div>
+                <div class="legend-item"><span style="background: rgb(255, 235, 175)"></span>Seasonally saturated,
+                    non-forested</div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Ephemeral Wetlands</h4>
+                <div class="legend-item"><span style="background: rgb(168, 112, 0)"></span>Ephemeral, forested</div>
+                <div class="legend-item"><span style="background: rgb(255, 170, 0)"></span>Ephemeral, non-forested</div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Peatlands</h4>
+                <div class="legend-item"><span style="background: rgb(158, 187, 215)"></span>Arctic/boreal, forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(218, 218, 235)"></span>Arctic/boreal, non-forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(122, 142, 245)"></span>Temperate, forested</div>
+                <div class="legend-item"><span style="background: rgb(175, 175, 255)"></span>Temperate, non-forested
+                </div>
+                <div class="legend-item"><span style="background: rgb(168, 0, 132)"></span>Tropical, forested</div>
+                <div class="legend-item"><span style="background: rgb(255, 115, 223)"></span>Tropical, non-forested
+                </div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Coastal & Other</h4>
+                <div class="legend-item"><span style="background: rgb(197, 0, 255)"></span>Mangrove</div>
+                <div class="legend-item"><span style="background: rgb(255, 255, 115)"></span>Saltmarsh</div>
+                <div class="legend-item"><span style="background: rgb(223, 115, 255)"></span>Delta</div>
+                <div class="legend-item"><span style="background: rgb(0, 255, 197)"></span>Other coastal wetland</div>
+                <div class="legend-item"><span style="background: rgb(255, 235, 190)"></span>Salt pan/saline wetland
+                </div>
+                <div class="legend-item"><span style="background: rgb(255, 190, 232)"></span>Rice paddies</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="map.js"></script>
+</body>
+
+</html>
