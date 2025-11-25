@@ -8,6 +8,7 @@ from minio import Minio
 from datetime import datetime, timedelta
 import streamlit
 import re
+import traceback
 duckdb_install_h3()
 
 con = ibis.duckdb.connect(extensions = ["spatial", "h3"])
@@ -134,6 +135,7 @@ Include the steps you took to get this message and any other details that might 
 """
 }
 
+
 from langchain_openai import ChatOpenAI
 import streamlit as st
 from langchain_openai.chat_models.base import BaseChatOpenAI
@@ -148,16 +150,69 @@ openrouter_api = os.getenv("OPENROUTER_API_KEY")
 if openrouter_api is None:
     openrouter_api = st.secrets["OPENROUTER_API_KEY"]
 
-llm_options = {
-    "mistral-small-3.2-24b-instruct": ChatOpenAI(model = "mistralai/mistral-small-3.2-24b-instruct:free", api_key=openrouter_api, base_url = "https://openrouter.ai/api/v1",  temperature=0),
-    "devstral-small-2505": ChatOpenAI(model = "mistralai/devstral-small-2505:free", api_key=openrouter_api, base_url = "https://openrouter.ai/api/v1",  temperature=0),
-    "gpt-oss-20b": ChatOpenAI(model = "openai/gpt-oss-20b:free", api_key=openrouter_api, base_url = "https://openrouter.ai/api/v1",  temperature=0),
-    "deepseek-r1t2-chimera": ChatOpenAI(model = "tngtech/deepseek-r1t2-chimera:free", api_key=openrouter_api, base_url = "https://openrouter.ai/api/v1",  temperature=0),
-    "kimi-dev-72b": ChatOpenAI(model = "moonshotai/kimi-dev-72b:free", api_key=openrouter_api, base_url = "https://openrouter.ai/api/v1",  temperature=0),
-    "hunyuan-a13b-instruct": ChatOpenAI(model = "tencent/hunyuan-a13b-instruct:free", api_key=openrouter_api, base_url = "https://openrouter.ai/api/v1",  temperature=0),
-    "olmo": ChatOpenAI(model = "olmo", api_key=api_key, base_url = "https://llm.nrp-nautilus.io/",  temperature=0),
-    "llama3": ChatOpenAI(model = "llama3", api_key=api_key, base_url = "https://llm.nrp-nautilus.io/",  temperature=0),
-    "qwen3": ChatOpenAI(model = "qwen3", api_key=api_key, base_url = "https://llm.nrp-nautilus.io/",  temperature=0),
-    "gemma3": ChatOpenAI(model = "gemma3", api_key=api_key, base_url = "https://llm.nrp-nautilus.io/",  temperature=0),
+openrouter_endpoint="https://openrouter.ai/api/v1"
+nrp_endpoint="http://ellm.nrp-nautilus.io/v1"
 
+# don't use a provider that collects data
+data_policy = {
+    "provider": {
+        "data_collection": "deny"
+    }
+}
+
+llm_options = {
+     "kat-coder-pro": ChatOpenAI(
+        model="kwaipilot/kat-coder-pro:free",
+        api_key=openrouter_api,
+        base_url=openrouter_endpoint,
+        temperature=0,
+        extra_body=data_policy
+    ),
+
+    "llama-3.3-70b-instruct": ChatOpenAI(
+        model="meta-llama/llama-3.3-70b-instruct:free",
+        api_key=openrouter_api,
+        base_url=openrouter_endpoint,
+        temperature=0,
+        extra_body=data_policy
+    ),
+        
+    "gpt-oss-20b": ChatOpenAI(
+        model="openai/gpt-oss-20b:free",
+        api_key=openrouter_api,
+        base_url=openrouter_endpoint,
+        temperature=0,
+        extra_body=data_policy
+    ),
+    
+    "qwen3-coder": ChatOpenAI(
+        model="qwen/qwen3-coder:free",
+        api_key=openrouter_api,
+        base_url=openrouter_endpoint,
+        temperature=0,
+        extra_body=data_policy
+    ),  
+    
+    "dolphin-mistral-24b-venice-edition": ChatOpenAI(
+        model="cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+        api_key=openrouter_api,
+        base_url=openrouter_endpoint,
+        temperature=0,
+        extra_body=data_policy
+    ),
+
+    "nemotron-nano-9b-v2": ChatOpenAI(
+        model="nvidia/nemotron-nano-9b-v2:free",
+        api_key=openrouter_api,
+        base_url=openrouter_endpoint,
+        temperature=0,
+        extra_body=data_policy
+    ),
+
+    "olmo-2-0325-32b-instruct": ChatOpenAI(
+        model="olmo",
+        api_key=api_key,
+        base_url=nrp_endpoint,
+        temperature=0
+    ),
 }
