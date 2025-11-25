@@ -3,6 +3,7 @@ from cng.h3 import *
 from ibis import _
 import importlib
 from datetime import time
+import openai
 
 st.set_page_config(layout="wide",
                    page_title="Wetlands",
