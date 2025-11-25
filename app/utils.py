@@ -4,8 +4,7 @@ from variables import *
 import altair as alt
 import re
 from branca.element import Template
-
-
+import pandas as pd
 
 def tpl_style_default(paint,pmtiles):
     source_layer_name = re.sub(r'\W+', '', os.path.splitext(os.path.basename(pmtiles))[0]) #stripping hyphens to get layer name 
@@ -75,8 +74,6 @@ def get_legend(paint, df = None, column = None):
     shape_type = 'circle'
 
     return legend, position, bg_color, fontsize, shape_type, controls 
-
-
 
 
     

@@ -10,7 +10,6 @@ global_wetlands:
 - Definition: Global wetlands
 - Schema: {global_wetlands}
 
-
 carbon: 
 - Definition: level of irrecoverable carbon
 - Schema: {carbon}
@@ -34,7 +33,7 @@ Ensure the response contains only this JSON object, with no additional text, for
 
 # Important Details
     - When joining tables, use the `h8` column.
-    - For visualization-related queries (e.g., "show me"), ALWAYS include "ATTRIBUTE" in the results, 
+    - For visualization-related queries (e.g., "show me"), ALWAYS include "ATTRIBUTE" in the results 
     - Wrap each column name in double quotes (") to denote them as delimited identifiers.
     - Wrap values that are strings in single quotes (') to distinguish them from column names. 
 
@@ -45,11 +44,22 @@ Ensure the response contains only this JSON object, with no additional text, for
 example_user: "Show me wetlands in the United States with high levels of carbon"
 example_assistant: {{"sql_query": 
     SELECT "ATTRIBUTE", AVG("carbon") AS "mean_carbon"
-    FROM conservation_almanac
+    FROM us_wetlands
     LEFT JOIN carbon
     USING (h8)
-    GROUP BY "ATTRIBUTE", "site", geom"
+    GROUP BY "ATTRIBUTE"
     ORDER BY "mean_carbon" DESC LIMIT 10;
-"explanation":"I joined `us_wetlands` with `carbon` to retrieve irrecoverable carbon levels for protected areas in the `conservation_almanac`. I returned 10 areas with highest levels of carbon.  
+"explanation":"I joined `us_wetlands` with `carbon` to retrieve irrecoverable carbon levels. I returned 10 wetlands with highest levels of carbon.  
 }}
 
+## Example:
+example_user: "Show me wetlands in the United States with high levels of biodiversity"
+example_assistant: {{"sql_query": 
+    SELECT "ATTRIBUTE", AVG("richness") AS "mean_richness"
+    FROM us_wetlands
+    LEFT JOIN mobi
+    USING (h8)
+    GROUP BY "ATTRIBUTE"
+    ORDER BY "mean_richness" DESC LIMIT 10;
+"explanation":"I joined `us_wetlands` with `mobi` to retrieve species richness. I returned 10 wetlands with highest levels of biodiversity.  
+}}

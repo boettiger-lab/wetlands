@@ -4,6 +4,8 @@ from ibis import _
 import importlib
 from datetime import time
 import openai
+import pandas as pd
+import traceback
 
 st.set_page_config(layout="wide",
                    page_title="Wetlands",
