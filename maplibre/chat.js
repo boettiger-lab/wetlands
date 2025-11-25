@@ -141,6 +141,9 @@ class WetlandsChatbot {
     }
 
     async queryLLM(userMessage) {
+        // Use the configured endpoint directly
+        let endpoint = this.llmEndpoint;
+
         // Build the prompt with system context
         const messages = [
             {
@@ -155,7 +158,7 @@ class WetlandsChatbot {
         ];
 
         // Call the LLM directly with user's API key
-        const response = await fetch(this.llmEndpoint, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -215,7 +218,7 @@ class WetlandsChatbot {
                 }
             ];
 
-            const followUpResponse = await fetch(this.llmEndpoint, {
+            const followUpResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

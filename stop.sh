@@ -10,23 +10,32 @@ echo -e "${RED}Stopping Wetlands Application Services...${NC}"
 
 cd "$(dirname "$0")"
 
-# Stop services using saved PIDs
+# Stop HTTP server
 if [ -f .http.pid ]; then
-    kill $(cat .http.pid) 2>/dev/null || true
+    PID=$(cat .http.pid)
+    if kill -0 $PID 2>/dev/null; then
+        kill $PID 2>/dev/null || kill -9 $PID 2>/dev/null
+        echo "Stopped HTTP server (PID: $PID)"
+    else
+        echo "HTTP server process not running (PID: $PID)"
+    fi
     rm .http.pid
-    echo "Stopped HTTP server"
 fi
 
+# Stop MCP server
 if [ -f .mcp.pid ]; then
-    kill $(cat .mcp.pid) 2>/dev/null || true
+    PID=$(cat .mcp.pid)
+    if kill -0 $PID 2>/dev/null; then
+        kill $PID 2>/dev/null || kill -9 $PID 2>/dev/null
+        echo "Stopped MCP server (PID: $PID)"
+    else
+        echo "MCP server process not running (PID: $PID)"
+    fi
     rm .mcp.pid
-    echo "Stopped MCP server"
 fi
 
-if [ -f .proxy.pid ]; then
-    kill $(cat .proxy.pid) 2>/dev/null || true
-    rm .proxy.pid
-    echo "Stopped LLM proxy"
-fi
+# Extra: kill any lingering processes on ports 8000/8001
+lsof -ti :8000 | xargs -r kill -9 2>/dev/null && echo "Force killed any process on port 8000"
+lsof -ti :8001 | xargs -r kill -9 2>/dev/null && echo "Force killed any process on port 8001"
 
 echo "All services stopped"
