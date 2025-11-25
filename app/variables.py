@@ -151,7 +151,7 @@ if openrouter_api is None:
     openrouter_api = st.secrets["OPENROUTER_API_KEY"]
 
 openrouter_endpoint="https://openrouter.ai/api/v1"
-nrp_endpoint="http://ellm.nrp-nautilus.io/v1"
+nrp_endpoint="https://ellm.nrp-nautilus.io/v1"
 
 # don't use a provider that collects data
 data_policy = {
