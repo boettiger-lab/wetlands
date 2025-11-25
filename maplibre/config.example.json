@@ -1,0 +1,5 @@
+{
+    "mcp_server_url": "http://localhost:8001/mcp",
+    "llm_endpoint": "https://ellm.nrp-nautilus.io/v1",
+    "llm_model": "gpt-oss"
+}

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LLM CORS Test</title>
+</head>
+<body>
+    <h1>LLM Connection Test</h1>
+    <button onclick="testLLM()">Test LLM Connection</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function testLLM() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing...';
+
+            const apiKey = prompt('Enter your NRP API key:');
+            if (!apiKey) {
+                output.textContent = 'No API key provided';
+                return;
+            }
+
+            try {
+                const response = await fetch('https://ellm.nrp-nautilus.io/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-oss',
+                        messages: [
+                            { role: 'user', content: 'Say hello' }
+                        ]
+                    })
+                });
+
+                output.textContent = `Status: ${response.status}\n`;
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    output.textContent += `Error: ${errorText}`;
+                } else {
+                    const data = await response.json();
+                    output.textContent += `Success!\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                output.textContent = `Fetch failed (likely CORS issue):\n${error.message}\n\n`;
+                output.textContent += 'Check browser console for CORS error details.';
+                console.error('Full error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

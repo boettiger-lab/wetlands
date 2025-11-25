@@ -1,0 +1,175 @@
+{
+  "mcp_server_url": "http://localhost:8001/mcp",
+  "llm_endpoint": "https://ellm.nrp-nautilus.io/v1",
+  "llm_api_key": "",
+  "llm_model": "gpt-oss",
+  "s3_endpoint": "minio.carlboettiger.info",
+  "datasets": {
+    "wetlands": {
+      "url": "s3://public-wetlands/hex/**",
+      "schema": [
+        "Z",
+        "h8",
+        "h0"
+      ],
+      "description": "Global wetlands classified by type, indexed by H3 hexagons"
+    },
+    "species_richness": {
+      "url": "https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet",
+      "schema": [
+        "richness",
+        "h8"
+      ],
+      "description": "Species richness by H3 hexagon"
+    },
+    "social_vulnerability": {
+      "url": "https://minio.carlboettiger.info/public-social-vulnerability/2022-tracts-h3-z8.parquet",
+      "schema": [
+        "h8",
+        "..."
+      ],
+      "description": "CDC Social Vulnerability Index 2022"
+    }
+  },
+  "wetland_types": {
+    "0": {
+      "name": "No data",
+      "category": null
+    },
+    "1": {
+      "name": "Freshwater lake",
+      "category": "Open Water"
+    },
+    "2": {
+      "name": "Saline lake",
+      "category": "Open Water"
+    },
+    "3": {
+      "name": "Reservoir",
+      "category": "Open Water"
+    },
+    "4": {
+      "name": "Large river",
+      "category": "Open Water"
+    },
+    "5": {
+      "name": "Small river",
+      "category": "Open Water"
+    },
+    "6": {
+      "name": "Coastal lagoon",
+      "category": "Coastal & Other"
+    },
+    "7": {
+      "name": "Delta",
+      "category": "Coastal & Other"
+    },
+    "8": {
+      "name": "Estuary",
+      "category": "Coastal & Other"
+    },
+    "9": {
+      "name": "Reef",
+      "category": "Coastal & Other"
+    },
+    "10": {
+      "name": "Salt marsh",
+      "category": "Coastal & Other"
+    },
+    "11": {
+      "name": "Mangrove",
+      "category": "Coastal & Other"
+    },
+    "12": {
+      "name": "Coastal wetland",
+      "category": "Coastal & Other"
+    },
+    "13": {
+      "name": "Freshwater marsh",
+      "category": "Palustrine Wetlands"
+    },
+    "14": {
+      "name": "Swamp forest",
+      "category": "Palustrine Wetlands"
+    },
+    "15": {
+      "name": "Flooded forest",
+      "category": "Palustrine Wetlands"
+    },
+    "16": {
+      "name": "Floodplain",
+      "category": "Riverine Wetlands"
+    },
+    "17": {
+      "name": "Oxbow lake",
+      "category": "Riverine Wetlands"
+    },
+    "18": {
+      "name": "Riverine wetland",
+      "category": "Riverine Wetlands"
+    },
+    "19": {
+      "name": "Lacustrine fringe",
+      "category": "Lacustrine Wetlands"
+    },
+    "20": {
+      "name": "Lacustrine marsh",
+      "category": "Lacustrine Wetlands"
+    },
+    "21": {
+      "name": "Pan",
+      "category": "Ephemeral Wetlands"
+    },
+    "22": {
+      "name": "Intermittent wetland",
+      "category": "Ephemeral Wetlands"
+    },
+    "23": {
+      "name": "Seasonal wetland",
+      "category": "Ephemeral Wetlands"
+    },
+    "24": {
+      "name": "Bog",
+      "category": "Peatlands"
+    },
+    "25": {
+      "name": "Fen",
+      "category": "Peatlands"
+    },
+    "26": {
+      "name": "Mire",
+      "category": "Peatlands"
+    },
+    "27": {
+      "name": "String bog",
+      "category": "Peatlands"
+    },
+    "28": {
+      "name": "Palsa",
+      "category": "Peatlands"
+    },
+    "29": {
+      "name": "Peatland forest",
+      "category": "Peatlands"
+    },
+    "30": {
+      "name": "Tundra wetland",
+      "category": "Peatlands"
+    },
+    "31": {
+      "name": "Alpine wetland",
+      "category": "Peatlands"
+    },
+    "32": {
+      "name": "Wetland complex",
+      "category": "Coastal & Other"
+    },
+    "33": {
+      "name": "Unknown wetland",
+      "category": "Coastal & Other"
+    }
+  },
+  "h8_area_hectares": 73.7327598,
+  "h8_area_km2": 0.737327598,
+  "h8_area_sq_miles": 0.284679
+}
