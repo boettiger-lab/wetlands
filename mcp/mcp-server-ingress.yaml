@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-server-ingress
+  annotations:
+    # 1. Turn on CORS for this Ingress
+    haproxy.org/cors-enable: "true"
+    
+    # 2. Allow all origins (since you said it is a public service)
+    # If you want to restrict it later, replace "*" with "https://app.nrp-nautilus.io"
+    haproxy.org/cors-allow-origin: "*"
+    
+    # 3. Critical: Allow POST (for messages) and GET (for SSE)
+    haproxy.org/cors-allow-methods: "GET, POST, OPTIONS"
+    
+    # 4. Critical: Allow Content-Type (needed for the JSON payload)
+    haproxy.org/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # 5. Optional: Cache the preflight check for 10 minutes to reduce traffic
+    haproxy.org/cors-max-age: "600"
+
+spec:
+  ingressClassName: haproxy
+  tls:
+    - hosts:
+        - biodiversity-mcp.nrp-nautilus.io
+      # Note: Ensure you have a 'secretName' here if you are managing your own certs, 
+      # or that cert-manager is handling it if you see a valid HTTPS cert.
+      # secretName: biodiversity-tls 
+  rules:
+    - host: biodiversity-mcp.nrp-nautilus.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mcp-server
+                port:
+                  number: 8001

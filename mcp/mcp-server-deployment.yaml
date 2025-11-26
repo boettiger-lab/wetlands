@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  labels:
+    app: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-server
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+    spec:
+
+
+      containers:
+      - name: mcp-server
+        image: astral/uv:python3.12-bookworm-slim
+        command: ["uvx", "mcp-server-motherduck", "--port", "8001", "--db-path", "/data/duck.db", "--transport", "sse"]
+        ports:
+        - containerPort: 8001
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        volumeMounts:
+        - name: duckdb-data
+          mountPath: /data
+      volumes:
+      - name: duckdb-data
+        persistentVolumeClaim:
+          claimName: duckdb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+spec:
+  selector:
+    app: mcp-server
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001

@@ -12,9 +12,11 @@ SQLAlchemy==2.0.35
 duckdb_engine== 0.15.0
 langchain-core==1.1.0
 langchain-openai==1.1.0
+langchain
 streamlit==1.50.0
 minio==7.2.15
 duckdb==1.2.2
 fastapi==0.115.0
 uvicorn==0.32.0
 httpx==0.27.0
+httpx-sse==0.4.0
