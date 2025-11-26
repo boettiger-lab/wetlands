@@ -6,6 +6,8 @@ metadata:
     app: mcp-server
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: mcp-server
@@ -19,7 +21,7 @@ spec:
       containers:
       - name: mcp-server
         image: astral/uv:python3.12-bookworm-slim
-        command: ["uvx", "mcp-server-motherduck", "--port", "8001", "--db-path", "/data/duck.db", "--transport", "sse"]
+        command: ["uvx", "mcp-server-motherduck", "--port", "8001", "--host", "0.0.0.0", "--db-path", "/data/duck.db", "--transport", "sse"]
         ports:
         - containerPort: 8001
         resources:
