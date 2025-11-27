@@ -106,7 +106,7 @@ To modify the chatbot:
 
 1. **UI changes**: Edit `chat.css`
 2. **Behavior changes**: Edit `chat.js`
-3. **System prompt**: Edit `../mcp/system-prompt.md`
+3. **System prompt**: Edit `system-prompt.md`
 4. **Data context**: Edit `../mcp/data-dictionary.md`
 
 The chatbot will automatically reload the system prompt on initialization.

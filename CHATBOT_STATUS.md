@@ -75,7 +75,7 @@ User sees response in chat
 | File | Purpose |
 |------|---------|
 | `/mcp/config.json` | MCP URL, LLM credentials, dataset metadata |
-| `/mcp/system-prompt.md` | LLM instructions (wetland codes, SQL patterns) |
+| `/maplibre/system-prompt.md` | LLM instructions (wetland codes, SQL patterns) |
 | `/mcp/data-dictionary.md` | Complete data schema documentation |
 | `/maplibre/chat.js` | Chatbot implementation |
 | `/maplibre/chat.css` | Chat UI styling |

@@ -24,9 +24,9 @@ metadata:
     # Cache preflight responses for 10 minutes
     haproxy.org/cors-max-age: "600"
     
-    # Increase timeout for LLM requests (120 seconds)
-    haproxy.org/timeout-http-request: "120s"
-    haproxy.org/timeout-server: "120s"
+    # Increase timeout for LLM requests (10 minutes for tool calling)
+    haproxy.org/timeout-http-request: "600s"
+    haproxy.org/timeout-server: "600s"
 
 spec:
   ingressClassName: haproxy
