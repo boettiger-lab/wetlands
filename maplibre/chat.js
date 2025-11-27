@@ -366,9 +366,9 @@ class WetlandsChatbot {
             console.log('[MCP] Executing query via MCP...');
             console.log('[MCP] Query:', functionArgs.query.substring(0, 100) + '...');
             const queryResult = await this.executeMCPQuery(functionArgs.query);
-            console.log('[MCP] Query result type:', typeof queryResult);
-            console.log('[MCP] Query result length:', queryResult?.length || 0);
-            console.log('[MCP] Query result preview:', queryResult?.substring(0, 500));
+            console.warn('[MCP] 🔍 Query result type:', typeof queryResult);
+            console.warn('[MCP] 🔍 Query result length:', queryResult?.length || 0);
+            console.warn('[MCP] 🔍 Query result preview:', queryResult?.substring(0, 500));
 
             // Send the result back to LLM for interpretation
             const followUpMessages = [
@@ -382,8 +382,8 @@ class WetlandsChatbot {
             ];
 
             console.log('[LLM] Sending follow-up request with tool result...');
-            console.log('[LLM] Follow-up messages count:', followUpMessages.length);
-            console.log('[LLM] Tool result being sent to LLM (first 300 chars):', queryResult.substring(0, 300));
+            console.warn('[LLM] 🔍 Follow-up messages count:', followUpMessages.length);
+            console.warn('[LLM] 🔍 Tool result being sent to LLM (first 300 chars):', queryResult.substring(0, 300));
             const followUpStartTime = Date.now();
 
             const followUpResponse = await fetch(endpoint, {
@@ -410,9 +410,9 @@ class WetlandsChatbot {
 
             const followUpData = await followUpResponse.json();
             console.log('[LLM] Follow-up response parsed successfully');
-            console.log('[LLM] Follow-up full response:', followUpData);
-            console.log('[LLM] Follow-up choices:', followUpData.choices);
-            console.log('[LLM] Follow-up message:', followUpData.choices?.[0]?.message);
+            console.warn('[LLM] 🔍 Follow-up full response:', followUpData);
+            console.warn('[LLM] 🔍 Follow-up choices:', followUpData.choices);
+            console.warn('[LLM] 🔍 Follow-up message:', followUpData.choices?.[0]?.message);
             console.log('[LLM] Follow-up message content length:', followUpData.choices[0].message.content?.length || 0);
 
             const finalContent = followUpData.choices[0].message.content;

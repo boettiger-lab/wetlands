@@ -71,7 +71,7 @@ SET THREADS=100;
 INSTALL httpfs;
 LOAD httpfs;
 
--- Configure S3 connection to MinIO
+-- Configure S3 connection to MinIO (NOTE: USE_SSL is one word with underscore!)
 CREATE OR REPLACE SECRET s3 (
     TYPE S3,
     ENDPOINT 'rook-ceph-rgw-nautiluss3.rook',
@@ -83,6 +83,7 @@ CREATE OR REPLACE SECRET s3 (
 **Why these settings matter:**
 - `SET THREADS=100` - Enables parallel S3 reads (I/O bound, not CPU bound)
 - `INSTALL/LOAD httpfs` - Required for S3/HTTP access to remote parquet files
+- `USE_SSL 'false'` - Must be USE_SSL (with underscore, not a space!)
 - `CREATE SECRET s3` - Configures connection to the MinIO S3-compatible storage
 
 ## Best Practices
