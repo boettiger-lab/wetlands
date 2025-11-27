@@ -412,8 +412,8 @@ class WetlandsChatbot {
                 body: JSON.stringify({
                     model: this.selectedModel,
                     messages: followUpMessages,
-                    tools: tools,  // Include tools so LLM can make additional tool calls if needed
-                    tool_choice: 'auto'
+                    // Do NOT allow additional tool calls - LLM should just interpret the result
+                    tool_choice: 'none'
                 })
             });
 
@@ -428,10 +428,21 @@ class WetlandsChatbot {
 
             const followUpData = await followUpResponse.json();
             console.log('[LLM] Follow-up response parsed successfully');
+            
+            // Log if LLM is trying to make additional tool calls
+            const followUpMessage = followUpData.choices?.[0]?.message;
+            if (followUpMessage?.tool_calls && followUpMessage.tool_calls.length > 0) {
+                console.warn('[LLM] ⚠️  LLM attempting additional tool calls in follow-up!');
+                console.warn('[LLM] 🔧 Attempted tool calls:', followUpMessage.tool_calls.map(tc => ({
+                    tool: tc.function.name,
+                    args: tc.function.arguments
+                })));
+            }
+            
             console.warn('[LLM] 🔍 Follow-up full response:', followUpData);
             console.warn('[LLM] 🔍 Follow-up choices:', followUpData.choices);
-            console.warn('[LLM] 🔍 Follow-up message:', followUpData.choices?.[0]?.message);
-            console.log('[LLM] Follow-up message content length:', followUpData.choices[0].message.content?.length || 0);
+            console.warn('[LLM] 🔍 Follow-up message:', followUpMessage);
+            console.log('[LLM] Follow-up message content length:', followUpMessage?.content?.length || 0);
 
             const finalContent = followUpData.choices[0].message.content;
 
