@@ -90,7 +90,7 @@ class WetlandsChatbot {
         });
 
         // Welcome message
-        this.addMessage('assistant', 'Hi! I can help you explore global wetlands data (GLWDv2.0). Try asking:\n\n • "How many hectares of peatlands are there?"\n • "What is the total area of freshwater wetlands?"\n • "Which wetlands have the highest biodiversity?"\n • "Compare coastal vs inland wetland areas"');
+        this.addMessage('assistant', 'Hi! I can help you explore global wetlands data (GLWDv2.0). Try asking:\n\n* "How many hectares of peatlands are there?"\n* "What is the total area of freshwater wetlands?"\n* "Which wetlands have the highest biodiversity?"\n* "Compare coastal vs inland wetland areas"');
     }
 
     toggleChat() {
@@ -106,7 +106,9 @@ class WetlandsChatbot {
         messageDiv.className = `chat-message ${role}`;
 
         // Use marked.js for markdown rendering
-        const formatted = marked.parse(content);
+        // Handle undefined/null/empty content
+        const safeContent = content || '';
+        const formatted = marked.parse(safeContent);
         messageDiv.innerHTML = formatted;
         messagesDiv.appendChild(messageDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -142,9 +144,10 @@ class WetlandsChatbot {
             const messagesDiv = document.getElementById('chat-messages');
             messagesDiv.removeChild(messagesDiv.lastChild);
 
-            // Add assistant response
-            this.addMessage('assistant', response);
-            this.messages.push({ role: 'assistant', content: response });
+            // Add assistant response (handle undefined/null)
+            const finalResponse = response || "I received an empty response. Please try again.";
+            this.addMessage('assistant', finalResponse);
+            this.messages.push({ role: 'assistant', content: finalResponse });
 
         } catch (error) {
             console.error('[Chat] Error caught:', error);

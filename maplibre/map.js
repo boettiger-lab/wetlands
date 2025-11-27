@@ -48,7 +48,8 @@ map.on('load', function () {
             ],
             'tileSize': 256,
             'minzoom': 0,
-            'maxzoom': 12
+            'maxzoom': 12,
+            'attribution': '<a href="https://data.hydrosheds.org/file/hydrobasins/GLWD_TechDoc_v2_0.pdf" target="_blank">GLWD v2.0</a>'
         });
 
         map.addLayer({
@@ -104,7 +105,8 @@ function switchBaseLayer(styleName) {
             ],
             'tileSize': 256,
             'minzoom': 0,
-            'maxzoom': 12
+            'maxzoom': 12,
+            'attribution': '<a href="https://data.hydrosheds.org/file/hydrobasins/GLWD_TechDoc_v2_0.pdf" target="_blank">GLWD v2.0</a>'
         });
 
         map.addLayer({
