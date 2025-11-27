@@ -78,23 +78,23 @@ class WetlandsChatbot {
         container.id = 'chat-container';
         container.innerHTML = `
             <div id="chat-header">
-                <div id="chat-title">
-                    <h3>🦆 Wetlands Data Assistant</h3>
-                    <select id="model-selector" title="Select LLM Model">
-                        <option value="glm-4.6">GLM-4.6</option>
-                        <option value="gpt-oss">GPT-OSS</option>
-                        <option value="qwen3">Qwen3</option>
-                        <option value="glm-v">GLM-V</option>
-                        <option value="gemma">Gemma</option>
-                        <option value="kimi">Kimi</option>
-                    </select>
-                </div>
+                <h3>🦆 Wetlands Data Assistant</h3>
                 <button id="chat-toggle">−</button>
             </div>
             <div id="chat-messages"></div>
             <div id="chat-input-container">
                 <input type="text" id="chat-input" placeholder="Ask about wetlands data..." />
                 <button id="chat-send">Send</button>
+            </div>
+            <div id="chat-footer">
+                <select id="model-selector" title="Select LLM Model">
+                    <option value="glm-4.6">GLM-4.6</option>
+                    <option value="gpt-oss">GPT-OSS</option>
+                    <option value="qwen3">Qwen3</option>
+                    <option value="glm-v">GLM-V</option>
+                    <option value="gemma">Gemma</option>
+                    <option value="kimi">Kimi</option>
+                </select>
             </div>
         `;
         document.body.appendChild(container);
