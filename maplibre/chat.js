@@ -229,27 +229,35 @@ class WetlandsChatbot {
             const queryResult = await this.executeMCPQuery(functionArgs.query);
 
             // Send the result back to LLM for interpretation
+            // Note: Include the assistant's message and the tool result as user message
             const followUpMessages = [
                 ...messages,
-                message, // LLM's tool call message
                 {
-                    role: 'tool',
-                    tool_call_id: toolCall.id,
-                    content: queryResult
+                    role: 'assistant',
+                    content: `I'll query the database with: ${functionArgs.query}`
+                },
+                {
+                    role: 'user',
+                    content: `Query result: ${queryResult}`
                 }
             ];
 
             const followUpResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.llmApiKey}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     model: this.config.llm_model || 'gpt-4',
                     messages: followUpMessages
                 })
             });
+
+            if (!followUpResponse.ok) {
+                const errorText = await followUpResponse.text();
+                console.error('Follow-up LLM API Error:', followUpResponse.status, errorText);
+                throw new Error(`Follow-up LLM API error (${followUpResponse.status})`);
+            }
 
             const followUpData = await followUpResponse.json();
             return followUpData.choices[0].message.content;
