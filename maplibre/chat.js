@@ -65,6 +65,7 @@ class WetlandsChatbot {
         } catch (error) {
             console.error('❌ MCP initialization error:', error);
             this.mcpClient = null;
+            this.mcpTools = []; // Ensure tools is an empty array, not undefined
             // Show error in chat UI
             setTimeout(() => {
                 this.addMessage('error', 'Database connection failed. Some features may not work. Please refresh the page.');
@@ -246,6 +247,7 @@ class WetlandsChatbot {
         ];
 
         // Convert MCP tools to OpenAI function format
+        console.log('[LLM] Raw MCP tools available:', this.mcpTools?.length || 0);
         const tools = this.mcpTools.map(tool => ({
             type: 'function',
             function: {
@@ -264,6 +266,8 @@ class WetlandsChatbot {
             }
         }));
 
+        console.log('[LLM] Converted tools:', JSON.stringify(tools, null, 2));
+
         const requestPayload = {
             model: this.selectedModel,
             messages: messages,
@@ -274,7 +278,8 @@ class WetlandsChatbot {
         console.log('[LLM] Request payload:', {
             model: requestPayload.model,
             messageCount: requestPayload.messages.length,
-            toolCount: requestPayload.tools.length
+            toolCount: requestPayload.tools.length,
+            firstToolName: requestPayload.tools[0]?.function?.name
         });
 
         // Call the LLM proxy (API key handled server-side)
