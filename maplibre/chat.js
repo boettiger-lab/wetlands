@@ -404,7 +404,6 @@ class WetlandsChatbot {
             console.warn('[LLM] 🔍 Tool result being sent to LLM (first 300 chars):', queryResult.substring(0, 300));
             const followUpStartTime = Date.now();
 
-            // CRITICAL: Do NOT include tools in follow-up response
             // This enforces ONE tool call per query - no chaining, no loops
             const followUpResponse = await fetch(endpoint, {
                 method: 'POST',
@@ -429,7 +428,7 @@ class WetlandsChatbot {
 
             const followUpData = await followUpResponse.json();
             console.log('[LLM] Follow-up response parsed successfully');
-            
+
             // Sanity check: tool_calls should be impossible since we didn't send tools
             const followUpMessage = followUpData.choices?.[0]?.message;
             if (followUpMessage?.tool_calls && followUpMessage.tool_calls.length > 0) {
@@ -437,7 +436,7 @@ class WetlandsChatbot {
                 console.error('[LLM] This should not happen - system may be broken');
                 console.error('[LLM] Attempted tool calls:', followUpMessage.tool_calls);
             }
-            
+
             console.warn('[LLM] 🔍 Follow-up message:', followUpMessage);
             console.log('[LLM] Follow-up message content length:', followUpMessage?.content?.length || 0);
 
