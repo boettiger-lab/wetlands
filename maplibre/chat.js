@@ -100,7 +100,7 @@ class WetlandsChatbot {
         toggle.textContent = container.classList.contains('collapsed') ? '+' : '−';
     }
 
-    addMessage(role, content) {
+    addMessage(role, content, metadata = {}) {
         const messagesDiv = document.getElementById('chat-messages');
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${role}`;
@@ -110,6 +110,35 @@ class WetlandsChatbot {
         const safeContent = content || '';
         const formatted = marked.parse(safeContent);
         messageDiv.innerHTML = formatted;
+
+        // Add SQL query details if present
+        if (metadata.sqlQuery) {
+            const detailsDiv = document.createElement('details');
+            detailsDiv.style.marginTop = '10px';
+            detailsDiv.style.fontSize = '12px';
+            detailsDiv.style.opacity = '0.8';
+
+            const summaryDiv = document.createElement('summary');
+            summaryDiv.textContent = '🔍 View SQL Query';
+            summaryDiv.style.cursor = 'pointer';
+            summaryDiv.style.userSelect = 'none';
+
+            const codeDiv = document.createElement('pre');
+            codeDiv.style.marginTop = '8px';
+            codeDiv.style.background = 'rgba(0, 0, 0, 0.1)';
+            codeDiv.style.padding = '8px';
+            codeDiv.style.borderRadius = '4px';
+            codeDiv.style.overflowX = 'auto';
+
+            const codeElement = document.createElement('code');
+            codeElement.textContent = metadata.sqlQuery;
+            codeDiv.appendChild(codeElement);
+
+            detailsDiv.appendChild(summaryDiv);
+            detailsDiv.appendChild(codeDiv);
+            messageDiv.appendChild(detailsDiv);
+        }
+
         messagesDiv.appendChild(messageDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
@@ -137,16 +166,17 @@ class WetlandsChatbot {
 
         try {
             console.log('[Chat] Calling queryLLM...');
-            const response = await this.queryLLM(userMessage);
-            console.log('[Chat] Got response, length:', response?.length);
+            const result = await this.queryLLM(userMessage);
+            console.log('[Chat] Got response, length:', result?.response?.length);
 
             // Remove loading message
             const messagesDiv = document.getElementById('chat-messages');
             messagesDiv.removeChild(messagesDiv.lastChild);
 
             // Add assistant response (handle undefined/null)
-            const finalResponse = response || "I received an empty response. Please try again.";
-            this.addMessage('assistant', finalResponse);
+            const finalResponse = result.response || "I received an empty response. Please try again.";
+            const metadata = result.sqlQuery ? { sqlQuery: result.sqlQuery } : {};
+            this.addMessage('assistant', finalResponse, metadata);
             this.messages.push({ role: 'assistant', content: finalResponse });
 
         } catch (error) {
@@ -167,13 +197,16 @@ class WetlandsChatbot {
 
     async queryLLM(userMessage) {
         if (!this.mcpClient) {
-            return "Sorry, the database connection is not available. Please refresh the page to try again.";
+            return { response: "Sorry, the database connection is not available. Please refresh the page to try again." };
         }
 
         // Use the configured endpoint directly
         let endpoint = this.llmEndpoint;
         console.log('[LLM] Starting request to:', endpoint);
         console.log('[LLM] Origin:', window.location.origin);
+
+        // Track SQL queries executed
+        let sqlQuery = null;
 
         // Build the prompt with system context
         const messages = [
@@ -260,6 +293,9 @@ class WetlandsChatbot {
 
             const functionArgs = JSON.parse(toolCall.function.arguments);
 
+            // Capture the SQL query
+            sqlQuery = functionArgs.query;
+
             // Check if the query argument is missing or empty
             if (!functionArgs.query || functionArgs.query.trim() === '') {
                 console.warn('[LLM] ⚠️  WARNING: Tool call missing or empty "query" argument!');
@@ -301,6 +337,8 @@ class WetlandsChatbot {
                             toolCall.function.arguments = retryToolCall.function.arguments;
                             toolCall.id = retryToolCall.id;
                             Object.assign(functionArgs, retryArgs);
+                            // Update captured SQL query
+                            sqlQuery = retryArgs.query;
                         } else {
                             console.error('[LLM] ❌ Retry failed - still no query argument');
                             throw new Error('LLM failed to provide SQL query after retry');
@@ -360,11 +398,17 @@ class WetlandsChatbot {
 
             const followUpData = await followUpResponse.json();
             console.log('[LLM] Follow-up response parsed successfully');
-            return followUpData.choices[0].message.content;
+            return {
+                response: followUpData.choices[0].message.content,
+                sqlQuery: sqlQuery
+            };
         }
 
         console.log('[LLM] Returning direct message content (no tool calls)');
-        return message.content;
+        return {
+            response: message.content,
+            sqlQuery: null
+        };
     }
 
     async executeMCPQuery(sqlQuery) {
