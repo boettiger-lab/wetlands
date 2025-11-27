@@ -23,7 +23,7 @@ app.add_middleware(
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept"],
+    allow_headers=["*"],  # Allow all headers to prevent preflight failures
 )
 
 # Get configuration from environment
