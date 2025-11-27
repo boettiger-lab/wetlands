@@ -74,8 +74,9 @@ LOAD httpfs;
 -- Configure S3 connection to MinIO
 CREATE OR REPLACE SECRET s3 (
     TYPE S3,
-    ENDPOINT 'minio.carlboettiger.info',
-    URL_STYLE 'path'
+    ENDPOINT 'rook-ceph-rgw-nautiluss3.rook',
+    URL_STYLE 'path',
+    USE_SSL 'false'
 );
 ```
 
