@@ -30,14 +30,14 @@ You have access to these primary datasets via SQL queries:
 
 To convert hexagon counts to area, use this formula:
 ```sql
--- Area in hectares (MUST use DISTINCT!)
-SELECT COUNT(DISTINCT h8) * 73.7327598 as area_hectares FROM ...
+-- Area in hectares
+SELECT COUNT(h8) * 73.7327598 as area_hectares FROM ...
 
--- Area in square kilometers (MUST use DISTINCT!)
-SELECT COUNT(DISTINCT h8) * 0.737327598 as area_km2 FROM ...
+-- Area in square kilometers
+SELECT COUNT(h8) * 0.737327598 as area_km2 FROM ...
 
--- Area in square miles (MUST use DISTINCT!)
-SELECT COUNT(DISTINCT h8) * 0.284679 as area_sq_miles FROM ...
+-- Area in square miles
+SELECT COUNT(h8) * 0.284679 as area_sq_miles FROM ...
 ```
 
 **ALWAYS include area calculations** when reporting wetland extents. For example:
@@ -115,9 +115,9 @@ SELECT
         WHEN Z BETWEEN 21 AND 23 THEN 'Ephemeral'
         WHEN Z IN (6,7,8,9,10,11,12,32,33) THEN 'Coastal & Other'
     END as category,
-    COUNT(DISTINCT h8) as hex_count,
-    ROUND(COUNT(DISTINCT h8) * 73.7327598, 2) as area_hectares,
-    ROUND(COUNT(DISTINCT h8) * 0.737327598, 2) as area_km2
+    COUNT(h8) as hex_count,
+    ROUND(COUNT(h8) * 73.7327598, 2) as area_hectares,
+    ROUND(COUNT(h8) * 0.737327598, 2) as area_km2
 FROM read_parquet('s3://public-wetlands/hex/**')
 WHERE Z > 0
 GROUP BY category
@@ -132,8 +132,8 @@ CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_S
 
 SELECT 
     w.Z as wetland_code,
-    COUNT(DISTINCT w.h8) as hex_count,
-    ROUND(COUNT(DISTINCT w.h8) * 73.7327598, 2) as area_hectares,
+    COUNT(w.h8) as hex_count,
+    ROUND(COUNT(w.h8) * 73.7327598, 2) as area_hectares,
     ROUND(AVG(s.richness), 1) as avg_species
 FROM read_parquet('s3://public-wetlands/hex/**') w
 JOIN read_parquet('https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet') s
@@ -152,10 +152,10 @@ CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_S
 
 SELECT 
     'Peatlands (codes 24-31)' as wetland_group,
-    COUNT(DISTINCT h8) as total_hexagons,
-    ROUND(COUNT(DISTINCT h8) * 73.7327598, 2) as total_hectares,
-    ROUND(COUNT(DISTINCT h8) * 0.737327598, 2) as total_km2,
-    ROUND(COUNT(DISTINCT h8) * 0.284679, 2) as total_sq_miles
+    COUNT(h8) as total_hexagons,
+    ROUND(COUNT(h8) * 73.7327598, 2) as total_hectares,
+    ROUND(COUNT(h8) * 0.737327598, 2) as total_km2,
+    ROUND(COUNT(h8) * 0.284679, 2) as total_sq_miles
 FROM read_parquet('s3://public-wetlands/hex/**')
 WHERE Z BETWEEN 24 AND 31;
 ```
@@ -188,7 +188,7 @@ WHERE Z BETWEEN 24 AND 31;
 **WRONG WORKFLOW (DON'T DO THIS):**
 ```
 User: "How many peatlands are there?"
-→ You query: SELECT COUNT(DISTINCT h8) FROM ... WHERE Z BETWEEN 24 AND 31
+→ You query: SELECT COUNT(h8) FROM ... WHERE Z BETWEEN 24 AND 31
 → You get result: 1000000
 → ❌ You query again: SELECT Z, COUNT(*) FROM ... WHERE Z BETWEEN 24 AND 31 GROUP BY Z
 → ❌ You make another tool call
@@ -199,7 +199,7 @@ This wastes time and often breaks!
 **CORRECT WORKFLOW (DO THIS):**
 ```
 User: "How many peatlands are there?"
-→ You query: SELECT COUNT(DISTINCT h8) FROM ... WHERE Z BETWEEN 24 AND 31  
+→ You query: SELECT COUNT(h8) FROM ... WHERE Z BETWEEN 24 AND 31  
 → You get result: 1000000
 → ✅ You respond: "There are approximately 1 million peatland hexagons..."
 → ✅ No additional tool calls, just interpret the result
