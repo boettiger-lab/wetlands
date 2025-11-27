@@ -44,12 +44,8 @@ LLM_API_KEY = os.getenv("NRP_API_KEY")
 if not LLM_API_KEY:
     print("WARNING: NRP_API_KEY environment variable not set!")
 
-class Message(BaseModel):
-    role: str
-    content: str
-
 class ChatRequest(BaseModel):
-    messages: List[Message]
+    messages: List[Dict[str, Any]]  # Accept any message format from OpenAI API
     tools: Optional[List[Dict[str, Any]]] = None
     tool_choice: Optional[str] = "auto"
     model: Optional[str] = "gpt-4"
@@ -76,7 +72,7 @@ async def proxy_chat(request: ChatRequest):
     
     payload = {
         "model": request.model,
-        "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
+        "messages": request.messages,  # Pass through messages as-is
         "temperature": request.temperature
     }
     
