@@ -31,10 +31,22 @@ try:
 except ImportError:
     print("⚠️  python-dotenv not installed, relying on system environment variables")
 
-# Configuration
-MCP_URL = os.getenv('MCP_URL', 'https://biodiversity-mcp.nrp-nautilus.io/sse')
-LLM_ENDPOINT = os.getenv('LLM_ENDPOINT', 'https://api.glama.ai/v1')
-LLM_MODEL = os.getenv('LLM_MODEL', 'glm-v')
+# Load configuration from config.local.json
+import json
+config_path = Path(__file__).parent.parent / 'maplibre' / 'config.local.json'
+if config_path.exists():
+    with open(config_path) as f:
+        config = json.load(f)
+    print(f"✓ Loaded configuration from {config_path}")
+else:
+    # Fallback to environment variables
+    config = {}
+    print("⚠️  No config.local.json found, using environment variables")
+
+# Configuration - prefer config file, fallback to env vars
+MCP_URL = os.getenv('MCP_URL', config.get('mcp_server_url', 'https://biodiversity-mcp.nrp-nautilus.io/sse'))
+LLM_ENDPOINT = os.getenv('LLM_ENDPOINT', config.get('llm_host', 'https://ellm.nrp-nautilus.io/v1/'))
+LLM_MODEL = os.getenv('LLM_MODEL', config.get('llm_model', 'glm-v'))
 API_KEY = os.getenv('NRP_API_KEY')
 
 # Print configuration status (without exposing sensitive data)
@@ -97,7 +109,7 @@ class TestMCPConnection:
     @pytest.mark.asyncio
     async def test_query_tool_exists(self, mcp_client):
         """Test that the 'query' tool is available."""
-        client, tools = await mcp_client
+        client, tools = mcp_client
         
         query_tool = next((t for t in tools if t.name == "query"), None)
         assert query_tool is not None, "Query tool not found"
@@ -107,7 +119,7 @@ class TestMCPConnection:
     @pytest.mark.asyncio
     async def test_direct_tool_invocation(self, mcp_client):
         """Test invoking the query tool directly."""
-        client, tools = await mcp_client
+        client, tools = mcp_client
         
         query_tool = next((t for t in tools if t.name == "query"), None)
         assert query_tool is not None
@@ -124,7 +136,7 @@ class TestLLMToolCalling:
     @pytest.mark.asyncio
     async def test_llm_receives_tools(self, mcp_client, llm):
         """Test that LLM can be bound with MCP tools."""
-        client, tools = await mcp_client
+        client, tools = mcp_client
         
         llm_with_tools = llm.bind_tools(tools)
         assert llm_with_tools is not None
@@ -133,7 +145,7 @@ class TestLLMToolCalling:
     @pytest.mark.asyncio
     async def test_llm_generates_tool_calls(self, mcp_client, llm):
         """Test that LLM generates tool calls for wetlands questions."""
-        client, tools = await mcp_client
+        client, tools = mcp_client
         llm_with_tools = llm.bind_tools(tools)
         
         messages = [

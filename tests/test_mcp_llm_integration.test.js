@@ -17,14 +17,30 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import OpenAI from 'openai';
 import EventSource from './eventsource-shim.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Polyfill EventSource for Node.js
 global.EventSource = EventSource;
 
-// Configuration
-const MCP_URL = process.env.MCP_URL || 'https://biodiversity-mcp.nrp-nautilus.io/sse';
-const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'https://api.glama.ai/v1';
-const LLM_MODEL = process.env.LLM_MODEL || 'glm-v';
+// Load configuration from config.local.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const configPath = path.join(__dirname, '..', 'maplibre', 'config.local.json');
+
+let config = {};
+if (fs.existsSync(configPath)) {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    console.log(`✓ Loaded configuration from ${configPath}`);
+} else {
+    console.log('⚠️  No config.local.json found, using environment variables');
+}
+
+// Configuration - prefer config file, fallback to env vars
+const MCP_URL = process.env.MCP_URL || config.mcp_server_url || 'https://biodiversity-mcp.nrp-nautilus.io/sse';
+const LLM_ENDPOINT = process.env.LLM_ENDPOINT || config.llm_host || 'https://ellm.nrp-nautilus.io/v1';
+const LLM_MODEL = process.env.LLM_MODEL || config.llm_model || 'glm-v';
 const API_KEY = process.env.NRP_API_KEY;
 
 const SYSTEM_PROMPT = `You are a helpful assistant that answers questions about wetlands data.
