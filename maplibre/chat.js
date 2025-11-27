@@ -210,7 +210,7 @@ class WetlandsChatbot {
             tools: tools,
             tool_choice: 'auto'
         };
-        
+
         console.log('[LLM] Request payload:', {
             model: requestPayload.model,
             messageCount: requestPayload.messages.length,
@@ -220,7 +220,7 @@ class WetlandsChatbot {
         // Call the LLM proxy (API key handled server-side)
         console.log('[LLM] Sending fetch request...');
         const startTime = Date.now();
-        
+
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -254,7 +254,7 @@ class WetlandsChatbot {
             const toolCall = message.tool_calls[0];
             console.log('[LLM] Executing tool:', toolCall.function.name);
             console.log('[LLM] Tool arguments:', toolCall.function.arguments);
-            
+
             const functionArgs = JSON.parse(toolCall.function.arguments);
 
             // Execute the query via MCP
@@ -275,7 +275,7 @@ class WetlandsChatbot {
 
             console.log('[LLM] Sending follow-up request with tool result...');
             const followUpStartTime = Date.now();
-            
+
             const followUpResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -284,19 +284,21 @@ class WetlandsChatbot {
                 },
                 body: JSON.stringify({
                     model: this.config.llm_model || 'gpt-4',
-                    messages: followUpMessages
+                    messages: followUpMessages,
+                    tools: tools,  // Include tools so LLM can make additional tool calls if needed
+                    tool_choice: 'auto'
                 })
             });
 
             const followUpElapsed = Date.now() - followUpStartTime;
             console.log(`[LLM] Follow-up response received after ${followUpElapsed}ms, status: ${followUpResponse.status}`);
-            
+
             if (!followUpResponse.ok) {
                 const errorText = await followUpResponse.text();
                 console.error('[LLM] Follow-up error:', followUpResponse.status, errorText);
                 throw new Error(`LLM follow-up error (${followUpResponse.status}): ${followUpResponse.statusText}`);
             }
-            
+
             const followUpData = await followUpResponse.json();
             console.log('[LLM] Follow-up response parsed successfully');
             return followUpData.choices[0].message.content;
