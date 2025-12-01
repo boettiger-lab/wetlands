@@ -601,33 +601,44 @@ class WetlandsChatbot {
 // Initialize chatbot when config is loaded
 let chatbot;
 
-// Try loading local config first (for local testing), fall back to production config
-fetch('config.local.json')
-    .then(response => {
-        if (!response.ok) throw new Error('Local config not found');
-        return response.json();
-    })
-    .then(config => {
-        console.log('Using local config for testing');
-        chatbot = new WetlandsChatbot(config);
-        console.log('Wetlands chatbot initialized');
-    })
-    .catch(() => {
-        // Fall back to production config
-        fetch('config.json')
-            .then(response => response.json())
-            .then(config => {
-                console.log('Using production config');
-                chatbot = new WetlandsChatbot(config);
-                console.log('Wetlands chatbot initialized');
-            })
-            .catch(error => {
-                console.error('Failed to load chatbot config:', error);
-                // Initialize with default config so UI still appears
-                chatbot = new WetlandsChatbot({
-                    mcp_server_url: 'https://biodiversity-mcp.nrp-nautilus.io/sse',
-                    llm_endpoint: 'https://llm-proxy.nrp-nautilus.io/chat',
-                    llm_model: 'qwen3'
+// Wait for DOM to be ready before initializing chatbot
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeChatbot);
+} else {
+    // DOM is already ready
+    initializeChatbot();
+}
+
+function initializeChatbot() {
+    // Try loading local config first (for local testing), fall back to production config
+    fetch('config.local.json')
+        .then(response => {
+            if (!response.ok) throw new Error('Local config not found');
+            return response.json();
+        })
+        .then(config => {
+            console.log('Using local config for testing');
+            chatbot = new WetlandsChatbot(config);
+            console.log('Wetlands chatbot initialized');
+        })
+        .catch(() => {
+            // Fall back to production config
+            fetch('config.json')
+                .then(response => response.json())
+                .then(config => {
+                    console.log('Using production config');
+                    chatbot = new WetlandsChatbot(config);
+                    console.log('Wetlands chatbot initialized');
+                })
+                .catch(error => {
+                    console.error('Failed to load chatbot config:', error);
+                    // Initialize with default config so UI still appears
+                    chatbot = new WetlandsChatbot({
+                        mcp_server_url: 'https://biodiversity-mcp.nrp-nautilus.io/sse',
+                        llm_endpoint: 'https://llm-proxy.nrp-nautilus.io/chat',
+                        llm_model: 'qwen3'
+                    });
                 });
-            });
-    });
+        });
+}
+
