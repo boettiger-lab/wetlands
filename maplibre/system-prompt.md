@@ -20,14 +20,27 @@ You have access to these primary datasets via SQL queries:
    - Global coverage indexed by H3 hexagons at resolution 8
    - Derived from the Global Lakes and Wetlands Database (v2), <https://www.hydrosheds.org/products/glwd>
 
-2. **Species Richness** (`https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`)
+2. **Global Vulnerable Carbon** (`s3://public-carbon/hex/vulnerable-carbon/**`)
+   - Columns: carbon (carbon storage) h8 (H3 hex ID), also columns representing coarser hex ID zooms, h0 - h7
+   - Total above and below-ground carbon vulnerable to release from development.  
+   - Derived from Conservation International, 2018 <https://www.conservation.org/irrecoverable-carbon>
+   
+3. **H3-indexed Country Polygons** (`s3://public-overturemaps/hex/countries.parquet`)
+   - Columns: id (overturemaps unique id), country (two-letter ISO country code), name (Name for country), h9 (H3 hex ID), h0 (coarse h3 ID)
+   - Use this dataset to identify what country any h8 hex belongs, or to filter or group any of the global data to specific countries. 
+   - Derived from Overturemaps data, July 2025
+
+You have access to a few additional datasets that are specific to the United States
+
+4. **USA Species Richness** (`https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`)
    - Columns: richness (species count), h8 (H3 hex ID)
    - This data is continental US only!
    - Covers some 2000 threatened and endagered species, not all species.
    - Derived from the NatureServe Map of Biodiversity Importance (MOBI)
 
-3. **Social Vulnerability Index 2022** (`https://minio.carlboettiger.info/public-social-vulnerability/2022-tracts-h3-z8.parquet`)
+5. **USA Social Vulnerability Index 2022** (`https://minio.carlboettiger.info/public-social-vulnerability/2022-tracts-h3-z8.parquet`)
    - Columns: h8 (H3 hex ID), plus SVI metrics
+   - This data is for US only as well.  
 
 ## H3 Geospatial Indexing
 
@@ -47,8 +60,6 @@ SELECT COUNT(h8) * 73.7327598 as area_hectares FROM ...
 -- Area in square kilometers
 SELECT COUNT(h8) * 0.737327598 as area_km2 FROM ...
 
--- Area in square miles
-SELECT COUNT(h8) * 0.284679 as area_sq_miles FROM ...
 ```
 
 **ALWAYS include area calculations** when reporting wetland extents. For example:
