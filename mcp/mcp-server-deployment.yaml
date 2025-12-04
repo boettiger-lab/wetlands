@@ -5,7 +5,7 @@ metadata:
   labels:
     app: mcp-server
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -42,8 +42,8 @@ spec:
         command: ["uvx", "mcp-server-motherduck", "--port", "8001", "--host", "127.0.0.1", "--db-path", ":memory:", "--transport", "sse"]
         resources:
           requests:
-            cpu: "1"
-            memory: "1Gi"
+            cpu: "2"
+            memory: "4Gi"
           limits:
             cpu: "32"
             memory: "120Gi"

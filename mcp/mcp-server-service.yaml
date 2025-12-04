@@ -5,7 +5,11 @@ metadata:
 spec:
   selector:
     app: mcp-server
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
   ports:
     - protocol: TCP
       port: 8001
-      targetPort: 8001
+      targetPort: 8080
