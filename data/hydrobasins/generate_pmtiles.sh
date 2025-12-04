@@ -5,6 +5,8 @@
 
 set -e  # Exit on error
 
+wget https://minio.carlboettiger.info/public-hydrobasins/combined_hydrobasins.gpkg
+
 GPKG="combined_hydrobasins.gpkg"
 OUTPUT_DIR="pmtiles"
 
