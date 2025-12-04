@@ -249,7 +249,8 @@ class WetlandsChatbot {
         let sqlQuery = null;
 
         // Build the prompt with system context
-        const messages = [
+        // We will maintain this conversation history for the duration of this turn
+        let currentTurnMessages = [
             {
                 role: 'system',
                 content: this.systemPrompt
@@ -293,244 +294,144 @@ class WetlandsChatbot {
 
         console.log('[LLM] Converted tools:', JSON.stringify(tools, null, 2));
 
-        const requestPayload = {
-            model: this.selectedModel,
-            messages: messages,
-            tools: tools,
-            tool_choice: 'auto'
-        };
+        let toolCallCount = 0;
+        const MAX_TOOL_CALLS = 5; // Guardrail: Allow up to 5 tool calls per user message
 
-        console.log('[LLM] Request payload:', {
-            model: requestPayload.model,
-            messageCount: requestPayload.messages.length,
-            toolCount: requestPayload.tools.length,
-            firstToolName: requestPayload.tools[0]?.function?.name
-        });
+        while (toolCallCount < MAX_TOOL_CALLS) {
+            const requestPayload = {
+                model: this.selectedModel,
+                messages: currentTurnMessages,
+                tools: tools,
+                tool_choice: 'auto'
+            };
 
-        // Call the LLM proxy (API key handled server-side)
-        console.log('[LLM] Sending fetch request...');
-        const startTime = Date.now();
+            console.log(`[LLM] Request payload (Step ${toolCallCount + 1}):`, {
+                model: requestPayload.model,
+                messageCount: requestPayload.messages.length,
+                toolCount: requestPayload.tools.length
+            });
 
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestPayload)
-        });
+            // Call the LLM proxy
+            console.log('[LLM] Sending fetch request...');
+            const startTime = Date.now();
 
-        const elapsed = Date.now() - startTime;
-        console.log(`[LLM] Response received after ${elapsed}ms, status: ${response.status}`);
-        console.log('[LLM] Response headers:', Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[LLM] Error response body:', errorText);
-            console.error('[LLM] Full response status:', response.status, response.statusText);
-            throw new Error(`LLM API error (${response.status}): ${response.statusText}`);
-        }
-
-        console.log('[LLM] Parsing JSON response...');
-        const data = await response.json();
-        console.log('[LLM] Response parsed successfully:', {
-            hasChoices: !!data.choices,
-            choiceCount: data.choices?.length
-        });
-        const message = data.choices[0].message;
-
-        // Check if LLM wants to call a tool
-        if (message.tool_calls && message.tool_calls.length > 0) {
-            console.log('[LLM] Tool calls requested:', message.tool_calls.length);
-            const toolCall = message.tool_calls[0];
-            console.log('[LLM] Executing tool:', toolCall.function.name);
-            console.log('[LLM] Tool arguments:', toolCall.function.arguments);
-            console.log('[LLM] Tool call ID:', toolCall.id);
-
-            const functionArgs = JSON.parse(toolCall.function.arguments);
-
-            // Capture the SQL query AND store it at instance level for persistence
-            sqlQuery = functionArgs.query;
-            this.lastSqlQuery = sqlQuery; // Store for entire conversation
-            console.log('[SQL] ✅ SQL query captured and stored:', sqlQuery ? sqlQuery.substring(0, 100) + '...' : 'NULL/UNDEFINED');
-
-            console.log('[LLM] Parsed query argument length:', functionArgs.query?.length || 0);
-
-            // Check if the query argument is missing or empty
-            if (!functionArgs.query || functionArgs.query.trim() === '') {
-                console.warn('[LLM] ⚠️  WARNING: Tool call missing or empty "query" argument!');
-                console.log('[LLM] Attempting retry with explicit prompt...');
-
-                // Retry with explicit prompt
-                const retryMessages = [
-                    ...messages,
-                    {
-                        role: 'user',
-                        content: 'Please provide the exact SQL query to answer this question. Use the "query" tool with the SQL as the argument.'
-                    }
-                ];
-
-                const retryResponse = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        model: this.selectedModel,
-                        messages: retryMessages,
-                        tools: tools,
-                        tool_choice: 'auto'
-                    })
-                });
-
-                if (retryResponse.ok) {
-                    const retryData = await retryResponse.json();
-                    const retryMessage = retryData.choices[0].message;
-
-                    if (retryMessage.tool_calls && retryMessage.tool_calls.length > 0) {
-                        const retryToolCall = retryMessage.tool_calls[0];
-                        const retryArgs = JSON.parse(retryToolCall.function.arguments);
-
-                        if (retryArgs.query && retryArgs.query.trim() !== '') {
-                            console.log('[LLM] ✅ Retry successful, got query!');
-                            // Use the retry results
-                            toolCall.function.arguments = retryToolCall.function.arguments;
-                            toolCall.id = retryToolCall.id;
-                            Object.assign(functionArgs, retryArgs);
-                            // Update captured SQL query at both levels
-                            sqlQuery = retryArgs.query;
-                            this.lastSqlQuery = retryArgs.query;
-                        } else {
-                            console.error('[LLM] ❌ Retry failed - still no query argument');
-                            throw new Error('LLM failed to provide SQL query after retry');
-                        }
-                    } else {
-                        console.error('[LLM] ❌ Retry did not generate tool calls');
-                        throw new Error('LLM did not generate a tool call after retry');
-                    }
-                } else {
-                    console.error('[LLM] ❌ Retry request failed');
-                    throw new Error('Failed to retry LLM request');
-                }
-            }
-
-            // Execute the query via MCP
-            console.log('[MCP] Executing query via MCP...');
-            console.log('[MCP] Query:', functionArgs.query.substring(0, 100) + '...');
-            const queryResult = await this.executeMCPQuery(functionArgs.query);
-            console.warn('[MCP] 🔍 Query result type:', typeof queryResult);
-            console.warn('[MCP] 🔍 Query result length:', queryResult?.length || 0);
-            console.warn('[MCP] 🔍 Query result preview:', queryResult?.substring(0, 500));
-
-            // Send the result back to LLM for interpretation
-            const followUpMessages = [
-                ...messages,
-                message, // LLM's tool call message
-                {
-                    role: 'tool',
-                    tool_call_id: toolCall.id,
-                    content: queryResult
-                }
-            ];
-
-            console.log('[LLM] Sending follow-up request with tool result...');
-            console.warn('[LLM] 🔍 Follow-up messages count:', followUpMessages.length);
-            console.warn('[LLM] 🔍 Tool result being sent to LLM (first 300 chars):', queryResult.substring(0, 300));
-            const followUpStartTime = Date.now();
-
-            // This enforces ONE tool call per query - no chaining, no loops
-            const followUpResponse = await fetch(endpoint, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    model: this.selectedModel,
-                    messages: followUpMessages
-                    // Deliberately omit 'tools' - LLM MUST respond with text, not more tool calls
-                })
+                body: JSON.stringify(requestPayload)
             });
 
-            const followUpElapsed = Date.now() - followUpStartTime;
-            console.log(`[LLM] Follow-up response received after ${followUpElapsed}ms, status: ${followUpResponse.status}`);
+            const elapsed = Date.now() - startTime;
+            console.log(`[LLM] Response received after ${elapsed}ms, status: ${response.status}`);
 
-            if (!followUpResponse.ok) {
-                const errorText = await followUpResponse.text();
-                console.error('[LLM] Follow-up error:', followUpResponse.status, errorText);
-                throw new Error(`LLM follow-up error (${followUpResponse.status}): ${followUpResponse.statusText}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[LLM] Error response body:', errorText);
+                throw new Error(`LLM API error (${response.status}): ${response.statusText}`);
             }
 
-            const followUpData = await followUpResponse.json();
-            console.log('[LLM] Follow-up response parsed successfully');
+            const data = await response.json();
+            const message = data.choices[0].message;
 
-            // Sanity check: tool_calls should be impossible since we didn't send tools
-            const followUpMessage = followUpData.choices?.[0]?.message;
-            if (followUpMessage?.tool_calls && followUpMessage.tool_calls.length > 0) {
-                console.error('[LLM] ❌ UNEXPECTED: LLM returned tool_calls despite no tools provided!');
-                console.error('[LLM] This should not happen - system may be broken');
-                console.error('[LLM] Attempted tool calls:', followUpMessage.tool_calls);
-            }
+            // Add the assistant's response to the conversation history
+            currentTurnMessages.push(message);
 
-            console.warn('[LLM] 🔍 Follow-up message:', followUpMessage);
-            console.log('[LLM] Follow-up message content length:', followUpMessage?.content?.length || 0);
+            // Check if LLM wants to call a tool
+            if (message.tool_calls && message.tool_calls.length > 0) {
+                toolCallCount++;
+                console.log(`[LLM] Tool calls requested (${toolCallCount}/${MAX_TOOL_CALLS}):`, message.tool_calls.length);
 
-            const finalContent = followUpData.choices[0].message.content;            // Check for empty response from LLM
-            if (!finalContent || finalContent.trim() === '') {
-                console.warn('[LLM] ⚠️  WARNING: LLM returned empty content after tool call');
-                console.log('[LLM] Tool result was:', queryResult.substring(0, 200));
-                console.log('[LLM] SQL query preserved for debugging:', sqlQuery ? sqlQuery.substring(0, 100) + '...' : 'NULL');
+                // Process all tool calls in this message
+                for (const toolCall of message.tool_calls) {
+                    console.log('[LLM] Executing tool:', toolCall.function.name);
+                    console.log('[LLM] Tool arguments:', toolCall.function.arguments);
+                    console.log('[LLM] Tool call ID:', toolCall.id);
+
+                    let functionArgs;
+                    try {
+                        functionArgs = JSON.parse(toolCall.function.arguments);
+                    } catch (e) {
+                        console.error('[LLM] Failed to parse tool arguments:', e);
+                        currentTurnMessages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: "Error: Failed to parse tool arguments. Please ensure arguments are valid JSON."
+                        });
+                        continue;
+                    }
+
+                    // Capture the SQL query AND store it at instance level for persistence
+                    if (functionArgs.query) {
+                        sqlQuery = functionArgs.query;
+                        this.lastSqlQuery = sqlQuery; // Store for entire conversation
+                        console.log('[SQL] ✅ SQL query captured and stored:', sqlQuery.substring(0, 100) + '...');
+                    }
+
+                    // Check if the query argument is missing or empty
+                    if (!functionArgs.query || functionArgs.query.trim() === '') {
+                        console.warn('[LLM] ⚠️  WARNING: Tool call missing or empty "query" argument!');
+                        currentTurnMessages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: "Error: The 'query' argument was missing or empty. Please provide a valid SQL query."
+                        });
+                        continue;
+                    }
+
+                    // Execute the query via MCP
+                    console.log('[MCP] Executing query via MCP...');
+                    let queryResult;
+                    try {
+                        queryResult = await this.executeMCPQuery(functionArgs.query);
+                    } catch (err) {
+                        console.error('[MCP] Execution error:', err);
+                        queryResult = `Error executing query: ${err.message}`;
+                    }
+
+                    // Add tool result to messages
+                    currentTurnMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: queryResult
+                    });
+                }
+
+                // Loop continues to next iteration to send tool results back to LLM
+            } else {
+                // No tool calls, this is the final response
+                console.log('[LLM] Returning direct message content (no tool calls)');
+                const directContent = message.content;
+
+                // Check for empty direct response
+                if (!directContent || directContent.trim() === '') {
+                    console.warn('[LLM] ⚠️  WARNING: LLM returned empty direct content');
+                    return {
+                        response: 'I received your question but had trouble generating a response. Please try rephrasing or asking something else.',
+                        sqlQuery: this.lastSqlQuery
+                    };
+                }
+
+                // Check for SQL as text (fallback check)
+                if (directContent.toLowerCase().includes('select ') &&
+                    directContent.toLowerCase().includes('from ') &&
+                    !this.lastSqlQuery) {
+                    console.warn('[LLM] ⚠️  WARNING: LLM appears to be returning SQL as text instead of using tool call!');
+                }
+
                 return {
-                    response: 'I processed the query but had trouble generating a response. **Check the SQL query below** to see what was executed. The query ran successfully but I couldn\'t interpret the results. Please try rephrasing your question.',
-                    sqlQuery: sqlQuery  // SQL query is preserved for UI display
+                    response: directContent,
+                    sqlQuery: this.lastSqlQuery
                 };
             }
-
-            console.log('[SQL] ✅ Returning response with SQL query:', sqlQuery ? sqlQuery.substring(0, 100) + '...' : 'NULL');
-            return {
-                response: finalContent,
-                sqlQuery: sqlQuery
-            };
         }
 
-        console.log('[LLM] Returning direct message content (no tool calls)');
-        console.log('[LLM] Direct content length:', message.content?.length || 0);
-
-        const directContent = message.content;
-
-        // Check for empty direct response
-        if (!directContent || directContent.trim() === '') {
-            console.warn('[LLM] ⚠️  WARNING: LLM returned empty direct content');
-            return {
-                response: 'I received your question but had trouble generating a response. Please try rephrasing or asking something else.',
-                sqlQuery: this.lastSqlQuery // Preserve last SQL query if available
-            };
-        }
-
-        // Detect if LLM is returning SQL as text instead of using tool call
-        // This indicates the LLM ignored the system prompt or tools weren't available
-        if (directContent.toLowerCase().includes('select ') ||
-            directContent.toLowerCase().includes('set threads') ||
-            directContent.toLowerCase().includes('install httpfs')) {
-            console.warn('[LLM] ⚠️  WARNING: LLM appears to be returning SQL as text instead of using tool call!');
-            console.warn('[LLM] This usually means:');
-            console.warn('[LLM]   1. MCP tools were not available when request was made');
-            console.warn('[LLM]   2. LLM is ignoring the system prompt instructions');
-            console.warn('[LLM]   3. LLM endpoint/model does not support function calling properly');
-
-            // If we have no prior SQL, this is likely the initial response with SQL as text
-            if (!this.lastSqlQuery) {
-                return {
-                    response: 'I generated a SQL query but was unable to execute it. The database tools may not be available. Please refresh the page and try again.\n\n' + directContent,
-                    sqlQuery: null
-                };
-            }
-        }
-
-        // For direct responses (no tool call), include last SQL if it exists
-        // This handles cases where the LLM asks follow-up questions after executing a query
-        console.log('[LLM] Last SQL query available:', !!this.lastSqlQuery);
+        // If we exit the loop, we hit the max tool calls limit
+        console.warn(`[LLM] ⚠️  Hit maximum tool call limit (${MAX_TOOL_CALLS})`);
         return {
-            response: directContent,
-            sqlQuery: this.lastSqlQuery // Include last SQL query if one was executed recently
+            response: `I've reached the maximum number of steps (${MAX_TOOL_CALLS}) allowed to answer your question without finding a final answer. I may be getting stuck in a loop. Please try to be more specific or ask a simpler question.`,
+            sqlQuery: this.lastSqlQuery
         };
     }
 
