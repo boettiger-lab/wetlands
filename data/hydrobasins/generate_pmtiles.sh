@@ -50,26 +50,67 @@ for level in {01..09}; do
 done
 
 # Combine all levels into single PMTiles with appropriate zoom ranges
-# Use -z/-Z flags per layer to control which detail level appears at which zoom
-tippecanoe \
-    --output="$OUTPUT" \
-    --name="HydroBasins" \
-    --attribution="HydroSHEDS/HydroBasins" \
-    --minimum-zoom=0 \
-    --maximum-zoom=14 \
-    --no-tile-size-limit \
-    --drop-densest-as-needed \
-    --extend-zooms-if-still-dropping \
-    --force \
-    --layer=hydrobasins:minzoom=0:maxzoom=4:"$TEMP_DIR/level_01.geojson" \
-    --layer=hydrobasins:minzoom=5:maxzoom=5:"$TEMP_DIR/level_02.geojson" \
-    --layer=hydrobasins:minzoom=6:maxzoom=6:"$TEMP_DIR/level_03.geojson" \
-    --layer=hydrobasins:minzoom=7:maxzoom=7:"$TEMP_DIR/level_04.geojson" \
-    --layer=hydrobasins:minzoom=8:maxzoom=8:"$TEMP_DIR/level_05.geojson" \
-    --layer=hydrobasins:minzoom=9:maxzoom=9:"$TEMP_DIR/level_06.geojson" \
-    --layer=hydrobasins:minzoom=10:maxzoom=10:"$TEMP_DIR/level_07.geojson" \
-    --layer=hydrobasins:minzoom=11:maxzoom=11:"$TEMP_DIR/level_08.geojson" \
-    --layer=hydrobasins:minzoom=12:maxzoom=14:"$TEMP_DIR/level_09.geojson"
+# Process each level with its own zoom range, then merge
+# Unfortunately tippecanoe doesn't support per-layer zoom in a single command,
+# so we need to create them separately and merge
+
+echo "Creating zoom 0-4 tiles from level_01..."
+tippecanoe -o "$TEMP_DIR/z0-4.pmtiles" -Z0 -z4 -l hydrobasins --force \
+    --name="HydroBasins" --attribution="HydroSHEDS/HydroBasins" \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_01.geojson"
+
+echo "Creating zoom 5 tiles from level_02..."
+tippecanoe -o "$TEMP_DIR/z5.pmtiles" -Z5 -z5 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_02.geojson"
+
+echo "Creating zoom 6 tiles from level_03..."
+tippecanoe -o "$TEMP_DIR/z6.pmtiles" -Z6 -z6 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_03.geojson"
+
+echo "Creating zoom 7 tiles from level_04..."
+tippecanoe -o "$TEMP_DIR/z7.pmtiles" -Z7 -z7 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_04.geojson"
+
+echo "Creating zoom 8 tiles from level_05..."
+tippecanoe -o "$TEMP_DIR/z8.pmtiles" -Z8 -z8 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_05.geojson"
+
+echo "Creating zoom 9 tiles from level_06..."
+tippecanoe -o "$TEMP_DIR/z9.pmtiles" -Z9 -z9 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_06.geojson"
+
+echo "Creating zoom 10 tiles from level_07..."
+tippecanoe -o "$TEMP_DIR/z10.pmtiles" -Z10 -z10 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_07.geojson"
+
+echo "Creating zoom 11 tiles from level_08..."
+tippecanoe -o "$TEMP_DIR/z11.pmtiles" -Z11 -z11 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_08.geojson"
+
+echo "Creating zoom 12-14 tiles from level_09..."
+tippecanoe -o "$TEMP_DIR/z12-14.pmtiles" -Z12 -z14 -l hydrobasins --force \
+    --no-tile-size-limit --drop-densest-as-needed \
+    "$TEMP_DIR/level_09.geojson"
+
+echo "Merging all zoom levels into single PMTiles..."
+tile-join -o "$OUTPUT" --force \
+    "$TEMP_DIR/z0-4.pmtiles" \
+    "$TEMP_DIR/z5.pmtiles" \
+    "$TEMP_DIR/z6.pmtiles" \
+    "$TEMP_DIR/z7.pmtiles" \
+    "$TEMP_DIR/z8.pmtiles" \
+    "$TEMP_DIR/z9.pmtiles" \
+    "$TEMP_DIR/z10.pmtiles" \
+    "$TEMP_DIR/z11.pmtiles" \
+    "$TEMP_DIR/z12-14.pmtiles"
 
 # Get file size for reporting
 SIZE=$(du -h "$OUTPUT" | cut -f1)
