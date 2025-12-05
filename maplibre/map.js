@@ -104,14 +104,43 @@ map.on('load', function () {
 
         console.log('NCP layer added successfully');
 
+        // Add vulnerable carbon layer
+        map.addSource('carbon-cog', {
+            'type': 'raster',
+            'tiles': [
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-carbon/cogs/vulnerable_c_total_2018.tif&colormap_name=reds'
+            ],
+            'tileSize': 256,
+            'minzoom': 0,
+            'maxzoom': 12,
+            'attribution': '<a href="https://www.conservation.org/irrecoverable-carbon" target="_blank">Irrecoverable Carbon (CI 2018)</a>'
+        });
+
+        map.addLayer({
+            'id': 'carbon-layer',
+            'type': 'raster',
+            'source': 'carbon-cog',
+            'paint': {
+                'raster-opacity': 0.7
+            },
+            'layout': {
+                'visibility': 'none'
+            }
+        });
+
+        console.log('Carbon layer added successfully');
+
         // Set up wetlands layer toggle after layer is added
         const wetlandsCheckbox = document.getElementById('wetlands-layer');
+        const legend = document.getElementById('legend');
         if (wetlandsCheckbox) {
             wetlandsCheckbox.addEventListener('change', function () {
                 if (this.checked) {
                     map.setLayoutProperty('wetlands-layer', 'visibility', 'visible');
+                    legend.style.display = 'block';
                 } else {
                     map.setLayoutProperty('wetlands-layer', 'visibility', 'none');
+                    legend.style.display = 'none';
                 }
             });
         }
@@ -124,6 +153,18 @@ map.on('load', function () {
                     map.setLayoutProperty('ncp-layer', 'visibility', 'visible');
                 } else {
                     map.setLayoutProperty('ncp-layer', 'visibility', 'none');
+                }
+            });
+        }
+
+        // Set up carbon layer toggle
+        const carbonCheckbox = document.getElementById('carbon-layer');
+        if (carbonCheckbox) {
+            carbonCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    map.setLayoutProperty('carbon-layer', 'visibility', 'visible');
+                } else {
+                    map.setLayoutProperty('carbon-layer', 'visibility', 'none');
                 }
             });
         }
@@ -141,6 +182,8 @@ function switchBaseLayer(styleName) {
         map.getLayoutProperty('wetlands-layer', 'visibility') !== 'none' : true;
     const ncpVisible = map.getLayer('ncp-layer') ?
         map.getLayoutProperty('ncp-layer', 'visibility') !== 'none' : false;
+    const carbonVisible = map.getLayer('carbon-layer') ?
+        map.getLayoutProperty('carbon-layer', 'visibility') !== 'none' : false;
 
     map.setStyle(styleUrl);
 
@@ -195,6 +238,32 @@ function switchBaseLayer(styleName) {
         if (!ncpVisible) {
             map.setLayoutProperty('ncp-layer', 'visibility', 'none');
             document.getElementById('ncp-layer').checked = false;
+        }
+
+        // Re-add carbon layer
+        map.addSource('carbon-cog', {
+            'type': 'raster',
+            'tiles': [
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-carbon/cogs/vulnerable_c_total_2018.tif&colormap_name=reds'
+            ],
+            'tileSize': 256,
+            'minzoom': 0,
+            'maxzoom': 12,
+            'attribution': '<a href="https://www.conservation.org/irrecoverable-carbon" target="_blank">Irrecoverable Carbon (CI 2018)</a>'
+        });
+
+        map.addLayer({
+            'id': 'carbon-layer',
+            'type': 'raster',
+            'source': 'carbon-cog',
+            'paint': {
+                'raster-opacity': 0.7
+            }
+        });
+
+        if (!carbonVisible) {
+            map.setLayoutProperty('carbon-layer', 'visibility', 'none');
+            document.getElementById('carbon-layer').checked = false;
         }
     });
 }
