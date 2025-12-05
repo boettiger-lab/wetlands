@@ -39,7 +39,7 @@ You have access to these primary datasets via SQL queries:
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Derived from Overturemaps data, July 2025
 
-5. **Nature's Contributions to People** (`s3://public-ncp/hex/ncp_bio_nathab/**`)
+5. **Nature's Contributions to People** (`s3://public-ncp/hex/ncp_biod_nathab/**`)
    - Columns: ncp (a score between 0 and 1 representing greatest contributions to least) h8 (H3 hex ID), h0 hex id. 
    - Derived from "Mapping the planet’s critical areas for biodiversity and nature’s contributions to people", <https://doi.org/10.1038/s41467-023-43832-9>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.

@@ -21,15 +21,13 @@ You have access to these primary datasets via SQL queries:
    - Derived from the Global Lakes and Wetlands Database (v2), <https://www.hydrosheds.org/products/glwd>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - NOTE: JOIN the wetlands data to category codes to access descriptions of the wetland types, `s3://public-wetlands/glwd/category_codes.csv`.  Columns are Z (wetland code, integer), name (short description), description (name and color code on map), and category (the 7 general categories of wetland type).
-
-
    
 2. **Global Vulnerable Carbon** (`s3://public-carbon/hex/vulnerable-carbon/**`)
    - Columns: carbon (carbon storage) h8 (H3 hex ID), also columns representing coarser hex ID zooms, h0 - h7
    - Total above and below-ground carbon vulnerable to release from development.  
    - Derived from Conservation International, 2018 <https://www.conservation.org/irrecoverable-carbon>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
-   
+
 3. **H3-indexed Country Polygons** (`s3://public-overturemaps/hex/countries.parquet`)
    - Columns: id (overturemaps unique id), country (two-letter ISO country code), name (Name for country), h8 (H3 hex ID), h0 (coarse h3 ID)
    - Use this dataset to identify what country any h8 hex belongs, or to filter or group any of the global data to specific countries. 
@@ -41,20 +39,20 @@ You have access to these primary datasets via SQL queries:
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Derived from Overturemaps data, July 2025
 
-
+5. **Nature's Contributions to People** (`s3://public-ncp/hex/ncp_biod_nathab/**`)
+   - Columns: ncp (a score between 0 and 1 representing greatest contributions to least) h8 (H3 hex ID), h0 hex id. 
+   - Derived from "Mapping the planet’s critical areas for biodiversity and nature’s contributions to people", <https://doi.org/10.1038/s41467-023-43832-9>
+   - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
 
 
 You have access to a few additional datasets that are specific to the United States
 
-4. **USA Species Richness** (`https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`)
+1. **USA Species Richness** (`https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`)
    - Columns: richness (species count), h8 (H3 hex ID)
    - This data is continental US only!
    - Covers some 2000 threatened and endagered species, not all species.
    - Derived from the NatureServe Map of Biodiversity Importance (MOBI)
 
-5. **USA Social Vulnerability Index 2022** (`https://minio.carlboettiger.info/public-social-vulnerability/2022-tracts-h3-z8.parquet`)
-   - Columns: h8 (H3 hex ID), plus SVI metrics
-   - This data is for US only as well.  
 
 ## H3 Geospatial Indexing
 
