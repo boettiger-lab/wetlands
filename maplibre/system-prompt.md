@@ -134,6 +134,7 @@ CREATE OR REPLACE SECRET s3 (
 5. **Join carefully** - Use `h8` column to join datasets; watch for case sensitivity
 6. **Limit results** - Use LIMIT for exploratory queries to keep responses manageable
 7. **Format numbers** - Round area calculations to appropriate precision (e.g., 2 decimal places for km²)
+8. **Use Regions Only When Asked** - Do not group by region unless the user explicitly asks for a regional breakdown. Default to country-level or global aggregation.
 
 ## Example Queries
 
@@ -190,6 +191,26 @@ SELECT
     ROUND(total_hexagons * 0.284679, 2) as total_sq_miles
 FROM read_parquet('s3://public-wetlands/glwd/hex/**')
 WHERE Z BETWEEN 22 AND 27;
+```
+
+**Evaluate wetlands by Nature's Contributions to People (NCP) in Australia, broken down by region:**
+```sql
+SET THREADS=100;
+INSTALL httpfs; LOAD httpfs;
+CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_STYLE 'path');
+
+SELECT 
+    r.name as region_name,
+    COUNT(*) as wetland_hex_count,
+    ROUND(COUNT(*) * 73.7327598, 2) as wetland_area_hectares,
+    ROUND(AVG(n.ncp), 3) as avg_ncp_score
+FROM read_parquet('s3://public-overturemaps/hex/regions/**') r
+JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w ON r.h8 = w.h8 AND r.h0 = w.h0
+JOIN read_parquet('s3://public-ncp/hex/ncp_biod_nathab/**') n ON w.h8 = n.h8 AND w.h0 = n.h0
+WHERE r.country = 'AU'
+GROUP BY r.name
+ORDER BY avg_ncp_score DESC
+LIMIT 10;
 ```
 
 ## Your Role
