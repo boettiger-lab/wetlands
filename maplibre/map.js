@@ -1,6 +1,6 @@
 const map = new maplibregl.Map({
     container: 'map',
-    projection: 'globe',
+    // projection: 'globe',
     style: 'https://api.maptiler.com/maps/dataviz-v4/style.json?key=0Vzl9yHwu0Xyx4TwT2Iw',
     center: [0, 20],
     zoom: 1.5
@@ -78,6 +78,32 @@ map.on('load', function () {
 
         console.log('Wetlands layer added successfully');
 
+        // Add NCP biodiversity layer
+        map.addSource('ncp-cog', {
+            'type': 'raster',
+            'tiles': [
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-ncp/NCP_biod_nathab_cog.tif&rescale=0,19&colormap_name=viridis'
+            ],
+            'tileSize': 256,
+            'minzoom': 0,
+            'maxzoom': 12,
+            'attribution': '<a href="https://doi.org/10.1038/s41467-023-43832-9" target="_blank">Nature\'s Contributions to People</a>'
+        });
+
+        map.addLayer({
+            'id': 'ncp-layer',
+            'type': 'raster',
+            'source': 'ncp-cog',
+            'paint': {
+                'raster-opacity': 0.7
+            },
+            'layout': {
+                'visibility': 'none'
+            }
+        });
+
+        console.log('NCP layer added successfully');
+
         // Set up wetlands layer toggle after layer is added
         const wetlandsCheckbox = document.getElementById('wetlands-layer');
         if (wetlandsCheckbox) {
@@ -86,6 +112,18 @@ map.on('load', function () {
                     map.setLayoutProperty('wetlands-layer', 'visibility', 'visible');
                 } else {
                     map.setLayoutProperty('wetlands-layer', 'visibility', 'none');
+                }
+            });
+        }
+
+        // Set up NCP layer toggle
+        const ncpCheckbox = document.getElementById('ncp-layer');
+        if (ncpCheckbox) {
+            ncpCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    map.setLayoutProperty('ncp-layer', 'visibility', 'visible');
+                } else {
+                    map.setLayoutProperty('ncp-layer', 'visibility', 'none');
                 }
             });
         }
@@ -98,13 +136,15 @@ map.on('load', function () {
 function switchBaseLayer(styleName) {
     const styleUrl = styleName === 'dark' ? darkStyleUrl : datavizStyleUrl;
 
-    // Store current wetlands layer state
+    // Store current layer states
     const wetlandsVisible = map.getLayer('wetlands-layer') ?
         map.getLayoutProperty('wetlands-layer', 'visibility') !== 'none' : true;
+    const ncpVisible = map.getLayer('ncp-layer') ?
+        map.getLayoutProperty('ncp-layer', 'visibility') !== 'none' : false;
 
     map.setStyle(styleUrl);
 
-    // Re-add wetlands layer after style loads
+    // Re-add layers after style loads
     map.once('styledata', function () {
         map.addSource('wetlands-cog', {
             'type': 'raster',
@@ -129,6 +169,32 @@ function switchBaseLayer(styleName) {
         if (!wetlandsVisible) {
             map.setLayoutProperty('wetlands-layer', 'visibility', 'none');
             document.getElementById('wetlands-layer').checked = false;
+        }
+
+        // Re-add NCP layer
+        map.addSource('ncp-cog', {
+            'type': 'raster',
+            'tiles': [
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-ncp/NCP_biod_nathab_cog.tif&rescale=0,19&colormap_name=viridis'
+            ],
+            'tileSize': 256,
+            'minzoom': 0,
+            'maxzoom': 12,
+            'attribution': '<a href="https://doi.org/10.1038/s41467-023-43832-9" target="_blank">Nature\'s Contributions to People</a>'
+        });
+
+        map.addLayer({
+            'id': 'ncp-layer',
+            'type': 'raster',
+            'source': 'ncp-cog',
+            'paint': {
+                'raster-opacity': 0.7
+            }
+        });
+
+        if (!ncpVisible) {
+            map.setLayoutProperty('ncp-layer', 'visibility', 'none');
+            document.getElementById('ncp-layer').checked = false;
         }
     });
 }
