@@ -1,6 +1,13 @@
 ---
 title: "Priority Watersheds for Wetland Conservation"
-format: gfm
+format:
+  gfm: default
+  html:
+    embed-resources: true
+    code-fold: true
+    code-tools: true
+    toc: true
+    toc-depth: 3
 ---
 
 ## Priority Watershed Analysis Methodology
