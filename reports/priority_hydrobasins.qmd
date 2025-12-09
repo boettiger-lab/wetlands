@@ -68,16 +68,19 @@ library(tidyr)
 
 # Configure DuckDB connection to S3
 duckdb_secrets(
-  key = "", 
-  secret = "", 
-  endpoint = "minio.carlboettiger.info"
+    key = "",
+    secret = "",
+    endpoint = "minio.carlboettiger.info"
 )
 
 # H3 hexagon area constant
 hex_hectares <- 73.7327598
 
 # Load datasets
-countries <- open_dataset("s3://public-overturemaps/hex/countries.parquet", recursive = FALSE)
+countries <- open_dataset(
+    "s3://public-overturemaps/hex/countries.parquet",
+    recursive = FALSE
+)
 wetlands <- open_dataset("s3://public-wetlands/glwd/hex/**")
 hydrobasins <- open_dataset("s3://public-hydrobasins/level_06/hexes/**")
 carbon <- open_dataset("s3://public-carbon/hex/vulnerable-carbon/**")
@@ -90,102 +93,122 @@ cat("✅ Datasets loaded successfully\n")
 ## Analysis Function
 
 ```{r}
-analyze_hydrobasins_for_country <- function(country_code, country_name, top_n = 3) {
-  cat("\n", paste(rep("=", 80), collapse = ""), "\n")
-  cat("Analyzing:", country_name, "(", country_code, ")\n")
-  cat(paste(rep("=", 80), collapse = ""), "\n\n")
-  
-  # Step 1: Get wetlands in basins for this country
-  basin_wetlands <- countries |>
-    filter(country == country_code) |>
-    inner_join(wetlands, by = c("h8", "h0")) |>
-    filter(Z > 0) |>
-    inner_join(hydrobasins, by = c("h8", "h0")) |>
-    select(basin_id = id, PFAF_ID, UP_AREA, SUB_AREA, h8, h0)
-  
-  # Step 2: Calculate metrics for each basin
-  basin_metrics <- basin_wetlands |>
-    # Join with carbon data
-    left_join(carbon, by = c("h8", "h0")) |>
-    # Join with protected areas
-    left_join(
-      wdpa |> select(h8, h0, wdpa_present = OBJECTID),
-      by = c("h8", "h0")
-    ) |>
-    # Join with NCP scores
-    left_join(ncp, by = c("h8", "h0")) |>
-    # Group by basin and calculate metrics
-    group_by(basin_id, PFAF_ID, UP_AREA, SUB_AREA) |>
-    summarise(
-      # A. Wetland area
-      wetland_hex_count = n_distinct(h8),
-      wetland_area_hectares = round(wetland_hex_count * hex_hectares, 2),
-      # B. Total carbon
-      total_carbon = round(coalesce(sum(carbon, na.rm = TRUE), 0), 2),
-      # C. Protected fraction
-      protected_fraction = round(
-        sum(!is.na(wdpa_present)) / n_distinct(h8), 
-        3
-      ),
-      # D. Average NCP score
-      avg_ncp_score = round(mean(ncp, na.rm = TRUE), 3),
-      .groups = "drop"
-    )
-  
-  # Step 3: Calculate composite scores
-  results <- basin_metrics |>
-    mutate(
-      # Normalize each metric (0-1 scale)
-      norm_wetland_area = wetland_area_hectares / max(wetland_area_hectares, na.rm = TRUE),
-      norm_carbon = total_carbon / max(total_carbon, na.rm = TRUE),
-      # Protection gap (inverse of protected fraction)
-      protection_gap = 1 - protected_fraction,
-      # Composite score (equal weights)
-      composite_score = round(
-        (norm_wetland_area * 0.25 +
-         norm_carbon * 0.25 +
-         protection_gap * 0.25 +
-         coalesce(avg_ncp_score, 0) * 0.25),
-        3
-      )
-    ) |>
-    # Select final columns
-    select(
-      basin_id, PFAF_ID,
-      upstream_area_km2 = UP_AREA,
-      basin_area_km2 = SUB_AREA,
-      wetland_hex_count,
-      wetland_area_hectares,
-      total_carbon,
-      protected_fraction,
-      avg_ncp_score,
-      composite_score
-    ) |>
-    filter(wetland_hex_count > 0) |>
-    arrange(desc(composite_score)) |>
-    head(top_n) |>
-    collect()
-  
-  if (nrow(results) > 0) {
-    results <- results |>
-      mutate(
-        country = country_name,
-        country_code = country_code
-      )
-    
-    cat("Top", top_n, "Priority Hydrobasins in", country_name, ":\n\n")
-    print(results |> 
-      select(basin_id, PFAF_ID, wetland_area_hectares, total_carbon, 
-             protected_fraction, avg_ncp_score, composite_score))
-  } else {
-    cat("No wetland data found for", country_name, "\n")
-    results <- tibble(
-      country = country_name,
-      country_code = country_code
-    )
-  }
-  
-  return(results)
+analyze_hydrobasins_for_country <- function(
+    country_code,
+    country_name,
+    top_n = 3
+) {
+    cat("\n", paste(rep("=", 80), collapse = ""), "\n")
+    cat("Analyzing:", country_name, "(", country_code, ")\n")
+    cat(paste(rep("=", 80), collapse = ""), "\n\n")
+
+    # Step 1: Get wetlands in basins for this country
+    basin_wetlands <- countries |>
+        filter(country == country_code) |>
+        inner_join(
+            wetlands,
+            by = c("h8", "h0"),
+            suffix = c("_country", "_wetland")
+        ) |>
+        filter(Z > 0) |>
+        inner_join(hydrobasins, by = c("h8", "h0"), suffix = c("", "_basin")) |>
+        select(basin_id = id_basin, PFAF_ID, UP_AREA, SUB_AREA, h8, h0)
+
+    # Step 2: Calculate metrics for each basin
+    basin_metrics <- basin_wetlands |>
+        # Join with carbon data
+        left_join(carbon, by = c("h8", "h0")) |>
+        # Join with protected areas
+        left_join(
+            wdpa |> select(h8, h0, wdpa_present = OBJECTID),
+            by = c("h8", "h0")
+        ) |>
+        # Join with NCP scores
+        left_join(ncp, by = c("h8", "h0")) |>
+        # Group by basin and calculate metrics
+        group_by(basin_id, PFAF_ID, UP_AREA, SUB_AREA) |>
+        summarise(
+            # A. Wetland area
+            wetland_hex_count = n_distinct(h8),
+            wetland_area_hectares = round(wetland_hex_count * hex_hectares, 2),
+            # B. Total carbon
+            total_carbon = round(coalesce(sum(carbon, na.rm = TRUE), 0), 2),
+            # C. Protected fraction
+            protected_fraction = round(
+                sum(!is.na(wdpa_present)) / n_distinct(h8),
+                3
+            ),
+            # D. Average NCP score
+            avg_ncp_score = round(mean(ncp, na.rm = TRUE), 3),
+            .groups = "drop"
+        )
+
+    # Step 3: Calculate composite scores
+    results <- basin_metrics |>
+        mutate(
+            # Normalize each metric (0-1 scale)
+            norm_wetland_area = wetland_area_hectares /
+                max(wetland_area_hectares, na.rm = TRUE),
+            norm_carbon = total_carbon / max(total_carbon, na.rm = TRUE),
+            # Protection gap (inverse of protected fraction)
+            protection_gap = 1 - protected_fraction,
+            # Composite score (equal weights)
+            composite_score = round(
+                (norm_wetland_area *
+                    0.25 +
+                    norm_carbon * 0.25 +
+                    protection_gap * 0.25 +
+                    coalesce(avg_ncp_score, 0) * 0.25),
+                3
+            )
+        ) |>
+        # Select final columns
+        select(
+            basin_id,
+            PFAF_ID,
+            upstream_area_km2 = UP_AREA,
+            basin_area_km2 = SUB_AREA,
+            wetland_hex_count,
+            wetland_area_hectares,
+            total_carbon,
+            protected_fraction,
+            avg_ncp_score,
+            composite_score
+        ) |>
+        filter(wetland_hex_count > 0) |>
+        arrange(desc(composite_score)) |>
+        head(top_n) |>
+        collect()
+
+    if (nrow(results) > 0) {
+        results <- results |>
+            mutate(
+                country = country_name,
+                country_code = country_code
+            )
+
+        cat("Top", top_n, "Priority Hydrobasins in", country_name, ":\n\n")
+        print(
+            results |>
+                select(
+                    basin_id,
+                    PFAF_ID,
+                    wetland_area_hectares,
+                    total_carbon,
+                    protected_fraction,
+                    avg_ncp_score,
+                    composite_score
+                )
+        )
+    } else {
+        cat("No wetland data found for", country_name, "\n")
+        results <- tibble(
+            country = country_name,
+            country_code = country_code
+        )
+    }
+
+    return(results)
 }
 ```
 
@@ -244,7 +267,11 @@ chile_results <- analyze_hydrobasins_for_country('CL', 'Chile', top_n = 3)
 ## Australia
 
 ```{r}
-australia_results <- analyze_hydrobasins_for_country('AU', 'Australia', top_n = 3)
+australia_results <- analyze_hydrobasins_for_country(
+    'AU',
+    'Australia',
+    top_n = 3
+)
 ```
 
 ## India
@@ -258,20 +285,38 @@ india_results <- analyze_hydrobasins_for_country('IN', 'India', top_n = 3)
 ```{r}
 # Combine all results
 all_results <- bind_rows(
-  us_results, canada_results, mexico_results,
-  china_results, korea_results, thailand_results,
-  uk_results, france_results, spain_results,
-  brazil_results, chile_results,
-  australia_results, india_results
+    us_results,
+    canada_results,
+    mexico_results,
+    china_results,
+    korea_results,
+    thailand_results,
+    uk_results,
+    france_results,
+    spain_results,
+    brazil_results,
+    chile_results,
+    australia_results,
+    india_results
 )
 
 cat("\n", paste(rep("=", 80), collapse = ""), "\n")
 cat("SUMMARY: Top Priority Hydrobasins Across All Countries\n")
 cat(paste(rep("=", 80), collapse = ""), "\n\n")
 
-print(all_results |> 
-  select(country, basin_id, PFAF_ID, wetland_area_hectares, 
-         total_carbon, protected_fraction, avg_ncp_score, composite_score))
+print(
+    all_results |>
+        select(
+            country,
+            basin_id,
+            PFAF_ID,
+            wetland_area_hectares,
+            total_carbon,
+            protected_fraction,
+            avg_ncp_score,
+            composite_score
+        )
+)
 
 # Save to CSV
 write.csv(all_results, 'priority_hydrobasins_results_r.csv', row.names = FALSE)
@@ -286,97 +331,104 @@ library(patchwork)
 
 # A. Wetland Area by Country
 p1 <- all_results |>
-  group_by(country) |>
-  summarise(total_wetland = sum(wetland_area_hectares, na.rm = TRUE)) |>
-  arrange(total_wetland) |>
-  mutate(country = factor(country, levels = country)) |>
-  ggplot(aes(x = country, y = total_wetland)) +
-  geom_col(fill = "steelblue") +
-  coord_flip() +
-  labs(
-    title = "A. Wetland Area in Top Hydrobasins by Country",
-    x = NULL,
-    y = "Total Wetland Area (hectares)"
-  ) +
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank())
+    group_by(country) |>
+    summarise(total_wetland = sum(wetland_area_hectares, na.rm = TRUE)) |>
+    arrange(total_wetland) |>
+    mutate(country = factor(country, levels = country)) |>
+    ggplot(aes(x = country, y = total_wetland)) +
+    geom_col(fill = "steelblue") +
+    coord_flip() +
+    labs(
+        title = "A. Wetland Area in Top Hydrobasins by Country",
+        x = NULL,
+        y = "Total Wetland Area (hectares)"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank())
 
 # B. Carbon Storage by Country
 p2 <- all_results |>
-  group_by(country) |>
-  summarise(total_carbon = sum(total_carbon, na.rm = TRUE)) |>
-  arrange(total_carbon) |>
-  mutate(country = factor(country, levels = country)) |>
-  ggplot(aes(x = country, y = total_carbon)) +
-  geom_col(fill = "darkgreen") +
-  coord_flip() +
-  labs(
-    title = "B. Carbon Storage in Top Hydrobasins by Country",
-    x = NULL,
-    y = "Total Vulnerable Carbon"
-  ) +
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank())
+    group_by(country) |>
+    summarise(total_carbon = sum(total_carbon, na.rm = TRUE)) |>
+    arrange(total_carbon) |>
+    mutate(country = factor(country, levels = country)) |>
+    ggplot(aes(x = country, y = total_carbon)) +
+    geom_col(fill = "darkgreen") +
+    coord_flip() +
+    labs(
+        title = "B. Carbon Storage in Top Hydrobasins by Country",
+        x = NULL,
+        y = "Total Vulnerable Carbon"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank())
 
 # C. Protected Fraction by Country
 p3 <- all_results |>
-  group_by(country) |>
-  summarise(avg_protected = mean(protected_fraction, na.rm = TRUE)) |>
-  arrange(avg_protected) |>
-  mutate(country = factor(country, levels = country)) |>
-  ggplot(aes(x = country, y = avg_protected)) +
-  geom_col(fill = "orange") +
-  coord_flip() +
-  scale_y_continuous(limits = c(0, 1)) +
-  labs(
-    title = "C. Protection Coverage in Top Hydrobasins by Country",
-    x = NULL,
-    y = "Average Protected Fraction"
-  ) +
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank())
+    group_by(country) |>
+    summarise(avg_protected = mean(protected_fraction, na.rm = TRUE)) |>
+    arrange(avg_protected) |>
+    mutate(country = factor(country, levels = country)) |>
+    ggplot(aes(x = country, y = avg_protected)) +
+    geom_col(fill = "orange") +
+    coord_flip() +
+    scale_y_continuous(limits = c(0, 1)) +
+    labs(
+        title = "C. Protection Coverage in Top Hydrobasins by Country",
+        x = NULL,
+        y = "Average Protected Fraction"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank())
 
 # D. NCP Score by Country
 p4 <- all_results |>
-  group_by(country) |>
-  summarise(avg_ncp = mean(avg_ncp_score, na.rm = TRUE)) |>
-  arrange(avg_ncp) |>
-  mutate(country = factor(country, levels = country)) |>
-  ggplot(aes(x = country, y = avg_ncp)) +
-  geom_col(fill = "purple") +
-  coord_flip() +
-  scale_y_continuous(limits = c(0, 1)) +
-  labs(
-    title = "D. Nature Contributions in Top Hydrobasins by Country",
-    x = NULL,
-    y = "Average NCP Score"
-  ) +
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank())
+    group_by(country) |>
+    summarise(avg_ncp = mean(avg_ncp_score, na.rm = TRUE)) |>
+    arrange(avg_ncp) |>
+    mutate(country = factor(country, levels = country)) |>
+    ggplot(aes(x = country, y = avg_ncp)) +
+    geom_col(fill = "purple") +
+    coord_flip() +
+    scale_y_continuous(limits = c(0, 1)) +
+    labs(
+        title = "D. Nature Contributions in Top Hydrobasins by Country",
+        x = NULL,
+        y = "Average NCP Score"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank())
 
 # Combine plots
 (p1 | p2) / (p3 | p4)
 
-ggsave('priority_hydrobasins_comparison_r.png', width = 14, height = 10, dpi = 300)
+ggsave(
+    'priority_hydrobasins_comparison_r.png',
+    width = 14,
+    height = 10,
+    dpi = 300
+)
 ```
 
 ## Composite Score Distribution
 
 ```{r fig.width=12, fig.height=6}
 all_results |>
-  ggplot(aes(x = reorder(country, composite_score, FUN = median), 
-             y = composite_score)) +
-  geom_boxplot(fill = "#66c2a5", alpha = 0.7) +
-  geom_jitter(width = 0.2, alpha = 0.5, size = 2) +
-  coord_flip() +
-  labs(
-    title = "Distribution of Composite Scores Across Countries",
-    subtitle = "Top 3 Hydrobasins Each",
-    x = NULL,
-    y = "Composite Score"
-  ) +
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank())
+    ggplot(aes(
+        x = reorder(country, composite_score, FUN = median),
+        y = composite_score
+    )) +
+    geom_boxplot(fill = "#66c2a5", alpha = 0.7) +
+    geom_jitter(width = 0.2, alpha = 0.5, size = 2) +
+    coord_flip() +
+    labs(
+        title = "Distribution of Composite Scores Across Countries",
+        subtitle = "Top 3 Hydrobasins Each",
+        x = NULL,
+        y = "Composite Score"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank())
 
 ggsave('composite_score_distribution_r.png', width = 12, height = 6, dpi = 300)
 ```
