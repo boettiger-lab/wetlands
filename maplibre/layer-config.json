@@ -1,0 +1,22 @@
+{
+    "layers": {
+        "wetlands-layer": {
+            "visible": true
+        },
+        "ncp-layer": {
+            "visible": false
+        },
+        "carbon-layer": {
+            "visible": false
+        },
+        "ramsar-layer": {
+            "visible": false
+        },
+        "wdpa-layer": {
+            "visible": false
+        },
+        "hydrobasins-layer": {
+            "visible": false
+        }
+    }
+}
