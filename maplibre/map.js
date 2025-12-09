@@ -72,15 +72,26 @@ function applyLayerConfig() {
         return;
     }
 
-    // Check if map and style are loaded
-    if (!map || !map.isStyleLoaded()) {
-        console.log('applyLayerConfig skipped - map or style not loaded yet');
+    // Check if map exists
+    if (!map) {
+        console.log('applyLayerConfig skipped - map not initialized yet');
+        return;
+    }
+
+    // Check if style is loaded - if not, wait for it
+    if (!map.isStyleLoaded()) {
+        console.log('applyLayerConfig waiting - style not loaded yet, will retry when style loads');
+        // Set up one-time listener for when style is loaded
+        map.once('styledata', () => {
+            console.log('Style loaded, retrying applyLayerConfig');
+            applyLayerConfig();
+        });
         return;
     }
 
     // Check if layers exist yet
     if (!map.getLayer('wetlands-layer')) {
-        console.log('applyLayerConfig skipped - layers not added to map yet');
+        console.log('applyLayerConfig skipped - layers not added to map yet, will retry on next poll');
         return;
     }
 
