@@ -200,10 +200,6 @@ class WetlandsChatbot {
 
         const progressDiv = document.createElement('div');
         progressDiv.className = 'query-progress';
-        progressDiv.style.marginBottom = '10px';
-        progressDiv.style.padding = '8px';
-        progressDiv.style.background = 'rgba(255, 255, 255, 0.6)';
-        progressDiv.style.borderRadius = '4px';
 
         const statusIcon = status === 'executing' ? '⏳' : '✅';
         const statusText = status === 'executing' ? 'Executing' : 'Completed';
@@ -212,29 +208,17 @@ class WetlandsChatbot {
 
         // Add description if provided
         if (description) {
-            content += `<div style="margin-top: 5px; font-size: 13px; opacity: 0.9;">${description}</div>`;
+            content += `<div class="description">${description}</div>`;
         }
 
         progressDiv.innerHTML = content;
 
         // Add SQL details (collapsed by default)
         const detailsDiv = document.createElement('details');
-        detailsDiv.style.marginTop = '5px';
-        detailsDiv.style.fontSize = '12px';
-        detailsDiv.style.opacity = '0.8';
-
         const summaryDiv = document.createElement('summary');
         summaryDiv.textContent = '🔍 View SQL';
-        summaryDiv.style.cursor = 'pointer';
-        summaryDiv.style.userSelect = 'none';
 
         const codeDiv = document.createElement('pre');
-        codeDiv.style.marginTop = '5px';
-        codeDiv.style.background = 'rgba(0, 0, 0, 0.1)';
-        codeDiv.style.padding = '8px';
-        codeDiv.style.borderRadius = '4px';
-        codeDiv.style.overflowX = 'auto';
-        codeDiv.style.maxHeight = '200px';
 
         const codeElement = document.createElement('code');
         codeElement.textContent = sqlQuery;
@@ -257,11 +241,6 @@ class WetlandsChatbot {
         const thinkingDiv = document.createElement('div');
         thinkingDiv.id = 'thinking-indicator';
         thinkingDiv.className = 'chat-message system';
-        thinkingDiv.style.padding = '12px';
-        thinkingDiv.style.background = 'rgba(255, 255, 255, 0.6)';
-        thinkingDiv.style.borderRadius = '8px';
-        thinkingDiv.style.fontStyle = 'italic';
-        thinkingDiv.style.opacity = '0.7';
         thinkingDiv.innerHTML = '💭 Thinking...';
 
         messagesDiv.appendChild(thinkingDiv);

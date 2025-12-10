@@ -115,8 +115,8 @@
 
 .chat-message.system {
     align-self: center;
-    background: rgba(255, 193, 7, 0.3);
-    color: #666;
+    background: rgba(255, 255, 255, 0.6);
+    color: #333;
     font-size: 12px;
     font-style: italic;
 }
@@ -243,4 +243,43 @@
 
 #chat-messages::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.3);
+}
+
+/* Query progress indicators */
+.query-progress {
+    margin-bottom: 10px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 4px;
+}
+
+.query-progress .description {
+    margin-top: 5px;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.query-progress details {
+    margin-top: 5px;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.query-progress summary {
+    cursor: pointer;
+    user-select: none;
+}
+
+.query-progress pre {
+    margin-top: 5px;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    max-height: 200px;
+}
+
+/* Thinking indicator */
+#thinking-indicator {
+    opacity: 0.7;
 }
