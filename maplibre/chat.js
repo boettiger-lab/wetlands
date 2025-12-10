@@ -94,7 +94,6 @@ class WetlandsChatbot {
                     <option value="gpt-oss">GPT-OSS</option>
                     <option value="qwen3">Qwen3</option>
                     <option value="glm-v">GLM-V</option>
-                    <option value="gemma">Gemma</option>
                     <option value="kimi" selected>Kimi</option>
                 </select>
             </div>
