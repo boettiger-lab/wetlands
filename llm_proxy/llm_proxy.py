@@ -18,6 +18,7 @@ app = FastAPI(title="LLM Proxy for Wetlands Chatbot")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://cboettig.github.io",
         "https://boettiger-lab.github.io",
         "http://localhost:8000",  # For local testing
     ],

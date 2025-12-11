@@ -29,6 +29,121 @@ map.on('sourcedata', function (e) {
 const darkStyleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const datavizStyleUrl = 'https://api.maptiler.com/maps/dataviz-v4/style.json?key=0Vzl9yHwu0Xyx4TwT2Iw';
 
+// Layer configuration management
+let layerConfig = null;
+let configChecksum = null;
+let pendingConfig = null; // Track config waiting to be applied when map is ready
+let userOverrides = {}; // Track which layers user has manually toggled
+
+// Configuration source - can be local or S3
+// For production, use S3 URL; for local testing, use local file
+const CONFIG_URL = 'https://minio.carlboettiger.info/public-outputs/wetlands/layer-config.json';
+// const CONFIG_URL = 'layer-config.json';  // Uncomment for local testing
+
+// Load and apply layer configuration
+async function loadLayerConfig() {
+    try {
+        console.log('Fetching config from:', CONFIG_URL);
+        const response = await fetch(CONFIG_URL + '?t=' + Date.now());
+        const config = await response.json();
+
+        // Calculate simple checksum to detect changes
+        const newChecksum = JSON.stringify(config);
+
+        if (newChecksum !== configChecksum) {
+            console.log('Config changed! New config:', config);
+            configChecksum = newChecksum;
+            layerConfig = config;
+            pendingConfig = config; // Mark as pending until successfully applied
+            // Clear user overrides when config changes - new config takes precedence
+            userOverrides = {};
+            applyLayerConfig();
+        } else {
+            console.log('Config unchanged (checksum match)');
+        }
+    } catch (error) {
+        console.error('Error loading layer configuration:', error);
+    }
+}
+
+// Apply the layer configuration to the map
+function applyLayerConfig() {
+    // If there's no pending config, nothing to do
+    if (!pendingConfig) {
+        console.log('applyLayerConfig skipped - no pending config');
+        return;
+    }
+
+    // Check if map exists
+    if (!map) {
+        console.log('applyLayerConfig skipped - map not initialized yet');
+        return;
+    }
+
+    // Check if our custom layers have been added to the map
+    // This is the only check we really need - if layers exist, we can change their visibility
+    if (!map.getLayer('wetlands-layer')) {
+        console.log('applyLayerConfig waiting - layers not added to map yet, will retry on next poll');
+        return;
+    }
+
+    console.log('✓ Applying layer config:', pendingConfig);
+    const legend = document.getElementById('legend');
+
+    Object.entries(pendingConfig.layers).forEach(([layerId, visible]) => {
+        console.log(`  Processing ${layerId}: visible=${visible}, userOverride=${userOverrides[layerId]}`);
+
+        // Skip if user has manually overridden this layer
+        if (userOverrides[layerId] !== undefined) {
+            console.log(`  → Skipping ${layerId} - user override active`);
+            return;
+        }
+
+        const visibility = visible ? 'visible' : 'none';
+        console.log(`  → Setting ${layerId} to ${visibility}`);        // Handle different layer types
+        if (layerId === 'wetlands-layer') {
+            if (map.getLayer('wetlands-layer')) {
+                map.setLayoutProperty('wetlands-layer', 'visibility', visibility);
+                if (legend) {
+                    legend.style.display = visible ? 'block' : 'none';
+                }
+            }
+        } else if (layerId === 'ramsar-layer') {
+            if (map.getLayer('ramsar-layer')) {
+                map.setLayoutProperty('ramsar-layer', 'visibility', visibility);
+                map.setLayoutProperty('ramsar-outline', 'visibility', visibility);
+            }
+        } else if (layerId === 'wdpa-layer') {
+            if (map.getLayer('wdpa-layer')) {
+                map.setLayoutProperty('wdpa-layer', 'visibility', visibility);
+                map.setLayoutProperty('wdpa-outline', 'visibility', visibility);
+            }
+        } else if (layerId === 'hydrobasins-layer') {
+            if (map.getLayer('hydrobasins-fill')) {
+                map.setLayoutProperty('hydrobasins-fill', 'visibility', visibility);
+                map.setLayoutProperty('hydrobasins-layer', 'visibility', visibility);
+            }
+        } else {
+            // Simple raster layers (ncp, carbon, etc.)
+            if (map.getLayer(layerId)) {
+                map.setLayoutProperty(layerId, 'visibility', visibility);
+            }
+        }
+
+        // Sync checkbox state
+        const checkbox = document.getElementById(layerId);
+        if (checkbox) {
+            checkbox.checked = visible;
+        }
+    });
+
+    // Clear pending config after successful application
+    console.log('✅ Layer configuration successfully applied');
+    pendingConfig = null;
+}
+
+// Note: Polling is started after map loads, see below
+
 // Load wetland colormap and initialize map
 let wetlandColormap;
 let wetlandColormapData;
@@ -330,11 +445,18 @@ map.on('load', function () {
 
         console.log('HydroBASINS layer added successfully');
 
+        // Load initial layer configuration and start polling
+        loadLayerConfig();
+        setInterval(loadLayerConfig, 5000);
+        console.log('Layer config polling started');
+
         // Set up wetlands layer toggle after layer is added
         const wetlandsCheckbox = document.getElementById('wetlands-layer');
         const legend = document.getElementById('legend');
         if (wetlandsCheckbox) {
             wetlandsCheckbox.addEventListener('change', function () {
+                // Mark as user override
+                userOverrides['wetlands-layer'] = this.checked;
                 if (this.checked) {
                     map.setLayoutProperty('wetlands-layer', 'visibility', 'visible');
                     legend.style.display = 'block';
@@ -349,6 +471,8 @@ map.on('load', function () {
         const ncpCheckbox = document.getElementById('ncp-layer');
         if (ncpCheckbox) {
             ncpCheckbox.addEventListener('change', function () {
+                // Mark as user override
+                userOverrides['ncp-layer'] = this.checked;
                 if (this.checked) {
                     map.setLayoutProperty('ncp-layer', 'visibility', 'visible');
                 } else {
@@ -361,6 +485,8 @@ map.on('load', function () {
         const carbonCheckbox = document.getElementById('carbon-layer');
         if (carbonCheckbox) {
             carbonCheckbox.addEventListener('change', function () {
+                // Mark as user override
+                userOverrides['carbon-layer'] = this.checked;
                 if (this.checked) {
                     map.setLayoutProperty('carbon-layer', 'visibility', 'visible');
                 } else {
@@ -373,6 +499,8 @@ map.on('load', function () {
         const ramsarCheckbox = document.getElementById('ramsar-layer');
         if (ramsarCheckbox) {
             ramsarCheckbox.addEventListener('change', function () {
+                // Mark as user override
+                userOverrides['ramsar-layer'] = this.checked;
                 const visibility = this.checked ? 'visible' : 'none';
                 map.setLayoutProperty('ramsar-layer', 'visibility', visibility);
                 map.setLayoutProperty('ramsar-outline', 'visibility', visibility);
@@ -383,6 +511,8 @@ map.on('load', function () {
         const wdpaCheckbox = document.getElementById('wdpa-layer');
         if (wdpaCheckbox) {
             wdpaCheckbox.addEventListener('change', function () {
+                // Mark as user override
+                userOverrides['wdpa-layer'] = this.checked;
                 const visibility = this.checked ? 'visible' : 'none';
                 map.setLayoutProperty('wdpa-layer', 'visibility', visibility);
                 map.setLayoutProperty('wdpa-outline', 'visibility', visibility);
@@ -393,6 +523,8 @@ map.on('load', function () {
         const hydrobasinsCheckbox = document.getElementById('hydrobasins-layer');
         if (hydrobasinsCheckbox) {
             hydrobasinsCheckbox.addEventListener('change', function () {
+                // Mark as user override
+                userOverrides['hydrobasins-layer'] = this.checked;
                 const visibility = this.checked ? 'visible' : 'none';
                 map.setLayoutProperty('hydrobasins-fill', 'visibility', visibility);
                 map.setLayoutProperty('hydrobasins-layer', 'visibility', visibility);

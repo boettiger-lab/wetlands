@@ -100,7 +100,7 @@ if [ "$USE_LOCAL_MCP" = true ]; then
     cd ..
 
     echo -e "${GREEN}Starting MCP proxy on port 8010...${NC}"
-    nohup uv run uvicorn app.mcp_proxy:app --host 0.0.0.0 --port 8010 > mcp_proxy.log 2>&1 &
+    nohup uv run uvicorn local_proxy.mcp_proxy:app --host 0.0.0.0 --port 8010 > mcp_proxy.log 2>&1 &
     MCP_PROXY_PID=$!
     sleep 2
     if ! kill -0 $MCP_PROXY_PID 2>/dev/null; then
@@ -111,7 +111,7 @@ fi
 
 # Always start LLM proxy locally (required for CORS when testing from localhost:8000)
 echo -e "${GREEN}Starting LLM proxy on port 8011...${NC}"
-nohup uv run uvicorn app.llm_proxy:app --host 0.0.0.0 --port 8011 > llm_proxy.log 2>&1 &
+nohup uv run uvicorn local_proxy.llm_proxy:app --host 0.0.0.0 --port 8011 > llm_proxy.log 2>&1 &
 LLM_PROXY_PID=$!
 sleep 2
 if ! kill -0 $LLM_PROXY_PID 2>/dev/null; then

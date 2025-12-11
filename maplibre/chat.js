@@ -21,7 +21,7 @@ class WetlandsChatbot {
         this.mcpClient = null;
         this.mcpTools = [];
         this.selectedModel = config.llm_model || 'kimi'; // Default model
-        this.lastSqlQuery = null; // Track the most recent SQL query executed
+        this.currentTurnQueries = []; // Track ALL SQL queries in current turn
 
         this.initializeUI();
         this.loadSystemPrompt();
@@ -94,7 +94,6 @@ class WetlandsChatbot {
                     <option value="gpt-oss">GPT-OSS</option>
                     <option value="qwen3">Qwen3</option>
                     <option value="glm-v">GLM-V</option>
-                    <option value="gemma">Gemma</option>
                     <option value="kimi" selected>Kimi</option>
                 </select>
             </div>
@@ -138,7 +137,7 @@ class WetlandsChatbot {
         messageDiv.className = `chat-message ${role}`;
 
         // Debug logging
-        console.log('[UI] Adding message, role:', role, 'has SQL:', !!metadata.sqlQuery);
+        console.log('[UI] Adding message, role:', role, 'has SQL queries:', metadata.sqlQueries?.length || 0);
 
         // Use marked.js for markdown rendering
         // Handle undefined/null/empty content
@@ -146,39 +145,193 @@ class WetlandsChatbot {
         const formatted = marked.parse(safeContent);
         messageDiv.innerHTML = formatted;
 
-        // Add SQL query details if present
-        if (metadata.sqlQuery) {
-            console.log('[UI] ✅ Appending SQL query details element');
-            const detailsDiv = document.createElement('details');
-            detailsDiv.style.marginTop = '10px';
-            detailsDiv.style.fontSize = '12px';
-            detailsDiv.style.opacity = '0.8';
+        messagesDiv.appendChild(messageDiv);
 
-            const summaryDiv = document.createElement('summary');
-            summaryDiv.textContent = '🔍 View SQL Query';
-            summaryDiv.style.cursor = 'pointer';
-            summaryDiv.style.userSelect = 'none';
+        // Add SQL query details if present - now handles multiple queries
+        if (metadata.sqlQueries && metadata.sqlQueries.length > 0) {
+            console.log(`[UI] ✅ Appending ${metadata.sqlQueries.length} SQL query details element(s)`);
 
-            const codeDiv = document.createElement('pre');
-            codeDiv.style.marginTop = '8px';
-            codeDiv.style.background = 'rgba(0, 0, 0, 0.1)';
-            codeDiv.style.padding = '8px';
-            codeDiv.style.borderRadius = '4px';
-            codeDiv.style.overflowX = 'auto';
+            metadata.sqlQueries.forEach((sqlQuery, index) => {
+                const detailsDiv = document.createElement('details');
+                detailsDiv.style.marginTop = '10px';
+                detailsDiv.style.fontSize = '12px';
+                detailsDiv.style.opacity = '0.8';
 
-            const codeElement = document.createElement('code');
-            codeElement.textContent = metadata.sqlQuery;
-            codeDiv.appendChild(codeElement);
+                const summaryDiv = document.createElement('summary');
+                const queryLabel = metadata.sqlQueries.length > 1 ? `Query ${index + 1}` : 'View SQL Query';
+                summaryDiv.textContent = `🔍 ${queryLabel}`;
+                summaryDiv.style.cursor = 'pointer';
+                summaryDiv.style.userSelect = 'none';
 
-            detailsDiv.appendChild(summaryDiv);
-            detailsDiv.appendChild(codeDiv);
-            messageDiv.appendChild(detailsDiv);
+                const codeDiv = document.createElement('pre');
+                codeDiv.style.marginTop = '8px';
+                codeDiv.style.background = 'rgba(0, 0, 0, 0.1)';
+                codeDiv.style.padding = '8px';
+                codeDiv.style.borderRadius = '4px';
+                codeDiv.style.overflowX = 'auto';
+
+                const codeElement = document.createElement('code');
+                codeElement.textContent = sqlQuery;
+                codeDiv.appendChild(codeElement);
+
+                detailsDiv.appendChild(summaryDiv);
+                detailsDiv.appendChild(codeDiv);
+                messagesDiv.appendChild(detailsDiv);
+            });
         } else if (role === 'assistant') {
-            console.log('[UI] No SQL query in metadata - this is expected for clarifications/follow-ups without prior queries');
+            console.log('[UI] No SQL queries in metadata - this is expected for clarifications/follow-ups without prior queries');
+        }
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Add a progress message showing SQL query execution
+    addProgressMessage(queryNumber, sqlQuery, description = null, status = 'executing') {
+        const messagesDiv = document.getElementById('chat-messages');
+
+        // Create or update progress container
+        let progressContainer = document.getElementById('progress-container');
+        if (!progressContainer) {
+            progressContainer = document.createElement('div');
+            progressContainer.id = 'progress-container';
+            progressContainer.className = 'chat-message system';
+            messagesDiv.appendChild(progressContainer);
         }
 
-        messagesDiv.appendChild(messageDiv);
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'query-progress';
+
+        const statusIcon = status === 'executing' ? '⏳' : '✅';
+        const statusText = status === 'executing' ? 'Executing' : 'Completed';
+
+        let content = `<strong>${statusIcon} ${statusText} Query ${queryNumber}</strong>`;
+
+        // Add description if provided
+        if (description) {
+            content += `<div class="description">${description}</div>`;
+        }
+
+        progressDiv.innerHTML = content;
+
+        // Add SQL details (OPEN by default so queries are immediately visible)
+        const detailsDiv = document.createElement('details');
+        detailsDiv.open = true; // Show SQL by default
+
+        const summaryDiv = document.createElement('summary');
+        summaryDiv.textContent = '🔍 SQL Query';
+
+        const codeDiv = document.createElement('pre');
+
+        const codeElement = document.createElement('code');
+        codeElement.textContent = sqlQuery;
+        codeDiv.appendChild(codeElement);
+
+        detailsDiv.appendChild(summaryDiv);
+        detailsDiv.appendChild(codeDiv);
+        progressDiv.appendChild(detailsDiv);
+
+        progressContainer.appendChild(progressDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        return progressDiv;
+    }
+
+    // Show thinking indicator immediately
+    showThinking() {
+        const messagesDiv = document.getElementById('chat-messages');
+
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.id = 'thinking-indicator';
+        thinkingDiv.className = 'chat-message system';
+        thinkingDiv.innerHTML = '💭 Thinking...';
+
+        messagesDiv.appendChild(thinkingDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Remove thinking indicator
+    clearThinking() {
+        const thinkingDiv = document.getElementById('thinking-indicator');
+        if (thinkingDiv) {
+            thinkingDiv.remove();
+        }
+    }
+
+    // Remove progress container
+    clearProgressMessages() {
+        const progressContainer = document.getElementById('progress-container');
+        if (progressContainer) {
+            progressContainer.remove();
+        }
+    }
+
+    // Generate a human-readable description of what a SQL query does
+    describeQuery(sqlQuery) {
+        const lower = sqlQuery.toLowerCase();
+
+        // Map layer update
+        if (lower.includes('layer-config.json')) {
+            const layers = [];
+            if (lower.includes("'wetlands-layer': true")) layers.push('wetlands');
+            if (lower.includes("'carbon-layer': true")) layers.push('carbon');
+            if (lower.includes("'ncp-layer': true")) layers.push('biodiversity');
+            if (lower.includes("'ramsar-layer': true")) layers.push('Ramsar sites');
+            if (lower.includes("'wdpa-layer': true")) layers.push('protected areas');
+            if (lower.includes("'hydrobasins-layer': true")) layers.push('watersheds');
+
+            if (layers.length > 0) {
+                return `Updating map to display: ${layers.join(', ')}`;
+            }
+            return 'Updating map layer visibility';
+        }
+
+        // Data export to CSV
+        if (lower.includes('.csv') && lower.includes('copy')) {
+            return 'Exporting results to CSV file';
+        }
+
+        // Count queries
+        if (lower.includes('count(')) {
+            if (lower.includes('ramsar')) return 'Counting Ramsar wetland sites';
+            if (lower.includes('wdpa')) return 'Counting protected areas';
+            if (lower.includes('peatland') || (lower.includes('z between') && lower.includes('22'))) {
+                return 'Calculating total peatland area';
+            }
+            if (lower.includes('wetland')) return 'Counting wetlands by type';
+            return 'Counting matching records';
+        }
+
+        // Sum/aggregate queries
+        if (lower.includes('sum(') && lower.includes('carbon')) {
+            return 'Calculating total carbon storage';
+        }
+
+        // Average queries
+        if (lower.includes('avg(') && lower.includes('ncp')) {
+            return 'Calculating average biodiversity importance';
+        }
+
+        // Geographic filters
+        let desc = 'Querying ';
+        if (lower.includes('ramsar')) desc += 'Ramsar sites';
+        else if (lower.includes('wdpa')) desc += 'protected areas';
+        else if (lower.includes('hydrobasin')) desc += 'watershed data';
+        else if (lower.includes('wetland')) desc += 'wetlands';
+        else desc += 'data';
+
+        // Add geographic context
+        if (lower.includes("country = 'us'") || lower.includes("iso3 = 'usa'")) {
+            desc += ' in the United States';
+        } else if (lower.includes("country = 'br'")) {
+            desc += ' in Brazil';
+        } else if (lower.includes("country = 'in'")) {
+            desc += ' in India';
+        } else if (lower.includes("country = 'au'")) {
+            desc += ' in Australia';
+        } else if (lower.includes('country =')) {
+            desc += ' by country';
+        }
+
+        return desc;
     }
 
     async sendMessage() {
@@ -199,39 +352,41 @@ class WetlandsChatbot {
         input.disabled = true;
         sendButton.disabled = true;
 
-        // Show loading
-        this.addMessage('system', 'Analyzing data<span class="loading-dots"></span>');
+        // Clear any previous progress messages from last turn
+        this.clearProgressMessages();
+
+        // Show immediate thinking indicator while LLM generates response
+        this.showThinking();
 
         try {
             console.log('[Chat] Calling queryLLM...');
             const result = await this.queryLLM(userMessage);
             console.log('[Chat] Got response, length:', result?.response?.length);
 
-            // Remove loading message
-            const messagesDiv = document.getElementById('chat-messages');
-            messagesDiv.removeChild(messagesDiv.lastChild);
+            // Clear thinking indicator only (KEEP progress messages visible)
+            this.clearThinking();
 
             // Add assistant response (handle undefined/null)
             const finalResponse = result.response || "I received an empty response. Please try again.";
-            const metadata = result.sqlQuery ? { sqlQuery: result.sqlQuery } : {};
 
-            // Debug logging for SQL query
-            if (result.sqlQuery) {
-                console.log('[Chat] ✅ SQL query captured for display:', result.sqlQuery.substring(0, 100) + '...');
+            // Debug logging for SQL queries
+            if (result.sqlQueries && result.sqlQueries.length > 0) {
+                console.log(`[Chat] ✅ ${result.sqlQueries.length} SQL queries executed`);
+                result.sqlQueries.forEach((q, i) => console.log(`[Chat]   Query ${i + 1}: ${q.substring(0, 100)}...`));
             } else {
-                console.log('[Chat] No SQL query to display (could be clarification, or no query executed yet)');
+                console.log('[Chat] No SQL queries executed (could be clarification, or no query needed)');
             }
 
-            this.addMessage('assistant', finalResponse, metadata);
+            // Show final interpretation message without metadata (queries already shown in progress)
+            this.addMessage('assistant', finalResponse);
             this.messages.push({ role: 'assistant', content: finalResponse });
 
         } catch (error) {
             console.error('[Chat] Error caught:', error);
             console.error('[Chat] Error stack:', error.stack);
 
-            // Remove loading message
-            const messagesDiv = document.getElementById('chat-messages');
-            messagesDiv.removeChild(messagesDiv.lastChild);
+            // Clear progress messages on error
+            this.clearProgressMessages();
 
             this.addMessage('error', `Error: ${error.message}`);
         } finally {
@@ -251,8 +406,8 @@ class WetlandsChatbot {
         console.log('[LLM] Starting request to:', endpoint);
         console.log('[LLM] Origin:', window.location.origin);
 
-        // Track SQL queries executed
-        let sqlQuery = null;
+        // Track ALL SQL queries executed in this turn
+        this.currentTurnQueries = [];
 
         // Build the prompt with system context
         // We will maintain this conversation history for the duration of this turn
@@ -276,7 +431,7 @@ class WetlandsChatbot {
             console.error('[LLM] ❌ No MCP tools available - cannot execute queries');
             return {
                 response: 'The database connection is not available. MCP tools failed to load. Please refresh the page and try again.',
-                sqlQuery: null
+                sqlQueries: []
             };
         }
 
@@ -349,6 +504,15 @@ class WetlandsChatbot {
                 toolCallCount++;
                 console.log(`[LLM] Tool calls requested (${toolCallCount}/${MAX_TOOL_CALLS}):`, message.tool_calls.length);
 
+                // SHOW PLANNING MESSAGE: Display LLM's thinking/planning text if present
+                if (message.content && message.content.trim()) {
+                    console.log('[LLM] Displaying planning/reasoning message:', message.content);
+                    if (toolCallCount === 1) {
+                        this.clearThinking(); // Clear initial "Thinking..." only on first message
+                    }
+                    this.addMessage('assistant-thinking', message.content);
+                }
+
                 // Process all tool calls in this message
                 for (const toolCall of message.tool_calls) {
                     console.log('[LLM] Executing tool:', toolCall.function.name);
@@ -368,11 +532,19 @@ class WetlandsChatbot {
                         continue;
                     }
 
-                    // Capture the SQL query AND store it at instance level for persistence
+                    // Capture the SQL query and add to array
                     if (functionArgs.query) {
-                        sqlQuery = functionArgs.query;
-                        this.lastSqlQuery = sqlQuery; // Store for entire conversation
-                        console.log('[SQL] ✅ SQL query captured and stored:', sqlQuery.substring(0, 100) + '...');
+                        this.currentTurnQueries.push(functionArgs.query);
+                        console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured:`, functionArgs.query.substring(0, 100) + '...');
+
+                        // Clear thinking indicator when first query starts executing
+                        if (this.currentTurnQueries.length === 1) {
+                            this.clearThinking();
+                        }
+
+                        // Generate description and show progress message in UI immediately
+                        const description = this.describeQuery(functionArgs.query);
+                        this.addProgressMessage(this.currentTurnQueries.length, functionArgs.query, description, 'executing');
                     }
 
                     // Check if the query argument is missing or empty
@@ -391,6 +563,7 @@ class WetlandsChatbot {
                     let queryResult;
                     try {
                         queryResult = await this.executeMCPQuery(functionArgs.query);
+                        console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
                     } catch (err) {
                         console.error('[MCP] Execution error:', err);
                         queryResult = `Error executing query: ${err.message}`;
@@ -415,20 +588,20 @@ class WetlandsChatbot {
                     console.warn('[LLM] ⚠️  WARNING: LLM returned empty direct content');
                     return {
                         response: 'I received your question but had trouble generating a response. Please try rephrasing or asking something else.',
-                        sqlQuery: this.lastSqlQuery
+                        sqlQueries: this.currentTurnQueries
                     };
                 }
 
                 // Check for SQL as text (fallback check)
                 if (directContent.toLowerCase().includes('select ') &&
                     directContent.toLowerCase().includes('from ') &&
-                    !this.lastSqlQuery) {
+                    this.currentTurnQueries.length === 0) {
                     console.warn('[LLM] ⚠️  WARNING: LLM appears to be returning SQL as text instead of using tool call!');
                 }
 
                 return {
                     response: directContent,
-                    sqlQuery: this.lastSqlQuery
+                    sqlQueries: this.currentTurnQueries
                 };
             }
         }
@@ -437,7 +610,7 @@ class WetlandsChatbot {
         console.warn(`[LLM] ⚠️  Hit maximum tool call limit (${MAX_TOOL_CALLS})`);
         return {
             response: `I've reached the maximum number of steps (${MAX_TOOL_CALLS}) allowed to answer your question without finding a final answer. I may be getting stuck in a loop. Please try to be more specific or ask a simpler question.`,
-            sqlQuery: this.lastSqlQuery
+            sqlQueries: this.currentTurnQueries
         };
     }
 
