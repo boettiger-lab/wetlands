@@ -305,110 +305,38 @@
     opacity: 0.7;
 }
 
-/* Tool proposal styles - matching assistant glass style */
-.chat-message.tool-proposal {
+/* Tool proposal and results use same style as assistant */
+.chat-message.tool-proposal,
+.chat-message.tool-results {
     align-self: flex-start;
     background: rgba(255, 255, 255, 0.6);
-    border-radius: 8px;
-    max-width: 95%;
-    padding: 12px;
     color: #333;
 }
 
-.tool-proposal-header {
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    color: #333;
-    font-weight: 600;
-}
-
-.tool-call-item {
-    margin: 8px 0;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-}
-
-.tool-call-name {
-    margin-bottom: 6px;
-    font-size: 13px;
-    color: #495057;
-}
-
+/* Buttons for tool approval */
 .tool-approval-buttons {
     display: flex;
     gap: 8px;
     margin-top: 12px;
 }
 
-.approve-btn,
-.reject-btn {
+.approve-btn {
     padding: 8px 16px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
-    transition: opacity 0.2s;
-}
-
-.approve-btn {
     background: #28a745;
     color: white;
+    transition: background 0.2s;
 }
 
 .approve-btn:hover:not(:disabled) {
     background: #218838;
 }
 
-.reject-btn {
-    background: #dc3545;
-    color: white;
-}
-
-.reject-btn:hover:not(:disabled) {
-    background: #c82333;
-}
-
-.approve-btn:disabled,
-.reject-btn:disabled {
+.approve-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-}
-
-/* Tool results styles - matching assistant glass style */
-.chat-message.tool-results {
-    align-self: flex-start;
-    background: rgba(255, 255, 255, 0.6);
-    border-radius: 8px;
-    max-width: 95%;
-    padding: 12px;
-    color: #333;
-}
-
-.tool-results-header {
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    color: #333;
-    font-weight: 600;
-}
-
-.tool-results details {
-    margin: 8px 0;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-}
-
-.tool-results summary {
-    cursor: pointer;
-    user-select: none;
-    font-weight: 500;
-    color: #4a90e2;
-}
-
-.tool-results summary:hover {
-    color: #2c5282;
 }

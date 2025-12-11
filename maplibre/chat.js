@@ -215,11 +215,10 @@ class WetlandsChatbot {
                 content += `</div>`;
             });
 
-            // Add approval buttons
+            // Add approval button
             content += `
-                <div class="tool-approval-buttons" style="margin-top: 12px; display: flex; gap: 8px;">
-                    <button class="approve-btn" style="padding: 6px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">✓ Run Query</button>
-                    <button class="reject-btn" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">✗ Cancel</button>
+                <div class="tool-approval-buttons" style="margin-top: 12px;">
+                    <button class="approve-btn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">✓ Run Query</button>
                 </div>
             `;
 
@@ -227,31 +226,19 @@ class WetlandsChatbot {
             messagesDiv.appendChild(proposalDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-            // Disable input while waiting for approval
+            // Re-enable input so user can type new question to interrupt
             const input = document.getElementById('chat-input');
             const sendButton = document.getElementById('chat-send');
-            input.disabled = true;
-            sendButton.disabled = true;
+            input.disabled = false;
+            sendButton.disabled = false;
 
             // Handle approval
             const approveBtn = proposalDiv.querySelector('.approve-btn');
-            const rejectBtn = proposalDiv.querySelector('.reject-btn');
 
             approveBtn.addEventListener('click', () => {
                 approveBtn.disabled = true;
-                rejectBtn.disabled = true;
                 approveBtn.textContent = '⏳ Running...';
                 resolve({ approved: true, toolCalls });
-            });
-
-            rejectBtn.addEventListener('click', () => {
-                approveBtn.disabled = true;
-                rejectBtn.disabled = true;
-                proposalDiv.style.opacity = '0.5';
-                input.disabled = false;
-                sendButton.disabled = false;
-                input.focus();
-                resolve({ approved: false });
             });
         });
     }
