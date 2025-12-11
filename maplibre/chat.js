@@ -507,9 +507,7 @@ class WetlandsChatbot {
                 // SHOW PLANNING MESSAGE: Display LLM's thinking/planning text if present
                 if (message.content && message.content.trim()) {
                     console.log('[LLM] Displaying planning/reasoning message:', message.content);
-                    if (toolCallCount === 1) {
-                        this.clearThinking(); // Clear initial "Thinking..." only on first message
-                    }
+                    this.clearThinking(); // Clear "Thinking..." indicator if still present
                     this.addMessage('assistant-thinking', message.content);
                 }
 
