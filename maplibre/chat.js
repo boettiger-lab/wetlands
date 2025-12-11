@@ -268,22 +268,6 @@ class WetlandsChatbot {
     describeQuery(sqlQuery) {
         const lower = sqlQuery.toLowerCase();
 
-        // Map layer update
-        if (lower.includes('layer-config.json')) {
-            const layers = [];
-            if (lower.includes("'wetlands-layer': true")) layers.push('wetlands');
-            if (lower.includes("'carbon-layer': true")) layers.push('carbon');
-            if (lower.includes("'ncp-layer': true")) layers.push('biodiversity');
-            if (lower.includes("'ramsar-layer': true")) layers.push('Ramsar sites');
-            if (lower.includes("'wdpa-layer': true")) layers.push('protected areas');
-            if (lower.includes("'hydrobasins-layer': true")) layers.push('watersheds');
-
-            if (layers.length > 0) {
-                return `Updating map to display: ${layers.join(', ')}`;
-            }
-            return 'Updating map layer visibility';
-        }
-
         // Data export to CSV
         if (lower.includes('.csv') && lower.includes('copy')) {
             return 'Exporting results to CSV file';
