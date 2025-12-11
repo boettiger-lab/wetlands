@@ -120,7 +120,7 @@ class WetlandsChatbot {
             'Hi! I can help you explore global wetlands data (GLWDv2.0). Try asking:\n\n' +
             '* "How many hectares of peatlands are there?"\n' +
             '* "Calculate vulnerable carbon stored in different wetlands of India?"\n' +
-            '* "Evaluate wetlands by Nature\'s Contributions to People (NCP) in Australia, broken down by region"'
+            '* "How many bird species can be found in forested wetlands in Costa Rica? List the species as csv."'
         );
     }
 
