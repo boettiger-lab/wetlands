@@ -1,28 +1,36 @@
 {
     "mcp_server_url": "https://biodiversity-mcp.nrp-nautilus.io/sse",
-    "llm_endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
     "llm_model": "kimi",
     "llm_models": [
         {
             "value": "glm-4.6",
-            "label": "GLM-4.6"
+            "label": "GLM-4.6",
+            "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+            "api_key": "EMPTY"
         },
         {
             "value": "gpt-oss",
-            "label": "GPT-OSS"
+            "label": "GPT-OSS",
+            "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+            "api_key": "EMPTY"
         },
         {
             "value": "qwen3",
-            "label": "Qwen3"
+            "label": "Qwen3",
+            "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+            "api_key": "EMPTY"
         },
         {
             "value": "glm-v",
-            "label": "GLM-V"
+            "label": "GLM-V",
+            "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+            "api_key": "EMPTY"
         },
         {
             "value": "kimi",
-            "label": "Kimi"
+            "label": "Kimi",
+            "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+            "api_key": "EMPTY"
         }
-    ],
-    "proxy_key": "EMPTY"
+    ]
 }

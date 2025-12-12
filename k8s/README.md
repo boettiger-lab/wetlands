@@ -38,20 +38,68 @@ After deployment, the website will be available at:
 - Internal: http://wetlands-maplibre.default.svc.cluster.local
 - External: https://wetlands.nrp-nautilus.io
 
-## Environment Variables
+## Configuration
+
+The application uses a two-layer configuration approach:
+
+1. **ConfigMap** (`wetlands-maplibre-config`) - Contains the config template with placeholders
+2. **Secrets** (`llm-proxy-secrets`) - Contains the shared API key for the LLM proxy
+
+### Environment Variables
 
 The deployment injects these environment variables into the runtime config:
 
-- `LLM_ENDPOINT` - LLM proxy base URL (https://llm-proxy.nrp-nautilus.io/v1)
-- `LLM_MODEL` - Model to use (kimi)
-- `MCP_SERVER_URL` - MCP server SSE endpoint (https://biodiversity-mcp.nrp-nautilus.io/sse)
-- `PROXY_KEY` - Authentication key for accessing the LLM proxy (from `llm-proxy-secrets`)
+- `MCP_SERVER_URL` - MCP server SSE endpoint (default: https://biodiversity-mcp.nrp-nautilus.io/sse)
+- `LLM_ENDPOINT` - Shared LLM proxy base URL (default: https://llm-proxy.nrp-nautilus.io/v1)
+- `DEFAULT_LLM_MODEL` - Default model to use (default: kimi)
+- `PROXY_KEY` - Shared API key for all models using the same endpoint (from `llm-proxy-secrets`)
 
-**Note:** The LLM proxy requires two keys:
-1. `PROXY_KEY` - Client authentication (from app to proxy)
-2. `NRP_API_KEY` - LLM endpoint authentication (from proxy to actual LLM)
+### Setting up Secrets
 
-Both keys are stored in the `llm-proxy-secrets` Kubernetes secret. The `config.json` is generated at container startup by substituting environment variables into a template.
+1. Copy the example secrets file:
+   ```bash
+   cp k8s/secrets.yaml.example k8s/secrets.yaml
+   ```
+
+2. Edit `k8s/secrets.yaml` and replace the placeholder value with your actual API key:
+   ```yaml
+   stringData:
+     proxy-key: "your-actual-proxy-key-here"
+   ```
+   
+   **Note:** Since all models in this example use the same endpoint, they share the same API key. Use `"EMPTY"` if no authentication is required.
+
+3. Apply the secrets:
+   ```bash
+   kubectl apply -f k8s/secrets.yaml
+   ```
+
+### Per-Model Endpoints and Keys
+
+If you need different endpoints or API keys for different models:
+
+1. Edit the ConfigMap template in `configmap-nginx.yaml` to use different environment variables per model
+2. Add corresponding environment variables and secrets in `deployment.yaml`
+3. Update the secrets to include the additional keys
+
+**Note:** The configuration template is injected at pod startup using `envsubst`, substituting environment variables from the ConfigMap and Secrets into the final `config.json` served to the browser.
+
+## Deployment Order
+
+To deploy everything in the correct order:
+
+```bash
+# 1. Create secrets first (edit secrets.yaml with your actual keys)
+kubectl apply -f k8s/secrets.yaml
+
+# 2. Apply ConfigMaps
+kubectl apply -f k8s/configmap-nginx.yaml
+
+# 3. Deploy the application
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+```
 
 ## Monitoring
 

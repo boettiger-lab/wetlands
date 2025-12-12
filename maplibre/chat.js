@@ -15,7 +15,6 @@ class WetlandsChatbot {
     constructor(config) {
         this.config = config;
         this.mcpServerUrl = config.mcp_server_url;
-        this.llmEndpoint = config.llm_endpoint;
         this.systemPrompt = null;
         this.messages = [];
         this.mcpClient = null;
@@ -26,6 +25,21 @@ class WetlandsChatbot {
         this.initializeUI();
         this.loadSystemPrompt();
         this.initMCP();
+    }
+
+    getCurrentModelConfig() {
+        // Find the config for the currently selected model
+        const modelConfig = this.config.llm_models?.find(m => m.value === this.selectedModel);
+        if (!modelConfig) {
+            console.warn(`Model config not found for ${this.selectedModel}, using first model`);
+            return this.config.llm_models?.[0] || {
+                value: 'kimi',
+                label: 'Kimi',
+                endpoint: 'https://llm-proxy.nrp-nautilus.io/v1',
+                api_key: 'EMPTY'
+            };
+        }
+        return modelConfig;
     }
 
     async loadSystemPrompt() {
@@ -449,12 +463,16 @@ class WetlandsChatbot {
             return { response: "Sorry, the database connection is not available. Please refresh the page to try again." };
         }
 
+        // Get current model configuration
+        const modelConfig = this.getCurrentModelConfig();
+
         // Build full endpoint URL (base + /chat/completions)
-        let endpoint = this.llmEndpoint;
+        let endpoint = modelConfig.endpoint;
         if (!endpoint.endsWith('/chat/completions')) {
             endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
         }
         console.log('[LLM] Starting request to:', endpoint);
+        console.log('[LLM] Using model config:', { model: modelConfig.value, endpoint: modelConfig.endpoint });
         console.log('[LLM] Origin:', window.location.origin);
 
         // Track ALL SQL queries executed in this turn
@@ -532,12 +550,12 @@ class WetlandsChatbot {
                 'Content-Type': 'application/json'
             };
 
-            // Add proxy authorization if configured
-            if (this.config.proxy_key) {
-                headers['Authorization'] = `Bearer ${this.config.proxy_key}`;
-                console.log('[LLM] Using proxy key from config');
+            // Add authorization if configured for this model
+            if (modelConfig.api_key && modelConfig.api_key !== 'EMPTY') {
+                headers['Authorization'] = `Bearer ${modelConfig.api_key}`;
+                console.log('[LLM] Using API key from model config');
             } else {
-                console.log('[LLM] No proxy key in config');
+                console.log('[LLM] No API key configured for this model');
             }
 
             const response = await fetch(endpoint, {
@@ -770,35 +788,15 @@ if (document.readyState === 'loading') {
 }
 
 function initializeChatbot() {
-    // Try loading local config first (for local testing), fall back to production config
-    fetch('config.local.json')
-        .then(response => {
-            if (!response.ok) throw new Error('Local config not found');
-            return response.json();
-        })
+    fetch('config.json')
+        .then(response => response.json())
         .then(config => {
-            console.log('Using local config for testing');
+            console.log('Config loaded successfully');
             chatbot = new WetlandsChatbot(config);
             console.log('Wetlands chatbot initialized');
         })
-        .catch(() => {
-            // Fall back to production config
-            fetch('config.json')
-                .then(response => response.json())
-                .then(config => {
-                    console.log('Using production config');
-                    chatbot = new WetlandsChatbot(config);
-                    console.log('Wetlands chatbot initialized');
-                })
-                .catch(error => {
-                    console.error('Failed to load chatbot config:', error);
-                    // Initialize with default config so UI still appears
-                    chatbot = new WetlandsChatbot({
-                        mcp_server_url: 'https://biodiversity-mcp.nrp-nautilus.io/sse',
-                        llm_endpoint: 'https://llm-proxy.nrp-nautilus.io/v1',
-                        llm_model: 'qwen3'
-                    });
-                });
+        .catch(error => {
+            console.error('Failed to load chatbot config:', error);
         });
 }
 

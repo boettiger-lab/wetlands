@@ -1,6 +1,49 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: wetlands-maplibre-config
+data:
+  config.template.json: |
+    {
+        "mcp_server_url": "${MCP_SERVER_URL}",
+        "llm_model": "${DEFAULT_LLM_MODEL}",
+        "llm_models": [
+            {
+                "value": "glm-4.6",
+                "label": "GLM-4.6",
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
+            },
+            {
+                "value": "nimbus",
+                "label": "Spark-gpt-oss",
+                "endpoint": "https://vllm-nimbus.carlboettiger.info/v1",
+                "api_key": "${NIMBUS_API_KEY}"
+            },
+            {
+                "value": "qwen3",
+                "label": "Qwen3",
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
+            },
+            {
+                "value": "glm-v",
+                "label": "GLM-V",
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
+            },
+            {
+                "value": "kimi",
+                "label": "Kimi",
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
+            }
+        ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: wetlands-maplibre-nginx
 data:
   nginx.conf: |
