@@ -26,17 +26,10 @@ spec:
         - sh
         - -c
         - |
-          git clone --depth 1 https://github.com/boettiger-lab/wetlands.git /tmp/repo
-          cp -r /tmp/repo/maplibre/* /usr/share/nginx/html/
-          # Create a template for runtime config injection
-          cat > /usr/share/nginx/html/config.runtime.json << 'EOF'
-          {
-            "mcp_server_url": "${MCP_SERVER_URL}",
-            "llm_endpoint": "${LLM_ENDPOINT}",
-            "llm_model": "${LLM_MODEL}",
-            "proxy_key": "${PROXY_KEY}"
-          }
-          EOF
+          git clone --depth 1 https://github.com/cboettig/wetlands.git /tmp/repo
+          # Copy all files except config.json (will be generated from template)
+          cd /tmp/repo/maplibre
+          find . -type f ! -name 'config.json' -exec cp --parents {} /usr/share/nginx/html/ \;
         volumeMounts:
         - name: website-content
           mountPath: /usr/share/nginx/html
@@ -50,13 +43,18 @@ spec:
           value: "https://biodiversity-mcp.nrp-nautilus.io/sse"
         - name: LLM_ENDPOINT
           value: "https://llm-proxy.nrp-nautilus.io/v1"
-        - name: LLM_MODEL
+        - name: DEFAULT_LLM_MODEL
           value: "kimi"
         - name: PROXY_KEY
           valueFrom:
             secretKeyRef:
               name: llm-proxy-secrets
               key: proxy-key
+        - name: NIMBUS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nimbus-api-key
+              key: NIMBUS_API_KEY
         command:
         - sh
         - -c
@@ -64,7 +62,7 @@ spec:
           # Install envsubst for environment variable substitution
           apk add --no-cache gettext
           # Substitute environment variables in config template
-          envsubst < /usr/share/nginx/html/config.runtime.json > /usr/share/nginx/html/config.json
+          envsubst < /config/config.template.json > /usr/share/nginx/html/config.json
           # Start nginx
           nginx -g 'daemon off;'
         resources:
@@ -80,6 +78,8 @@ spec:
         - name: nginx-config
           mountPath: /etc/nginx/conf.d/default.conf
           subPath: nginx.conf
+        - name: config-template
+          mountPath: /config
         livenessProbe:
           httpGet:
             path: /health
@@ -97,6 +97,9 @@ spec:
       volumes:
       - name: website-content
         emptyDir: {}
+      - name: config-template
+        configMap:
+          name: wetlands-maplibre-config
       - name: nginx-config
         configMap:
           name: wetlands-maplibre-nginx

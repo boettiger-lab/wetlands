@@ -19,6 +19,13 @@ spec:
       labels:
         app: mcp-server
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: stratus1.nrp-espm.berkeley.edu
+      tolerations:
+      - key: "nautilus.io/issue"
+        operator: "Equal"
+        value: "1476"
+        effect: "NoSchedule"
       containers:
       # Nginx sidecar to add CORS headers
       - name: nginx-cors-proxy
@@ -42,12 +49,16 @@ spec:
         command: ["uvx", "mcp-server-motherduck", "--port", "8001", "--host", "127.0.0.1", "--db-path", ":memory:", "--transport", "sse"]
         resources:
           requests:
-            cpu: "2"
-            memory: "4Gi"
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "100Gi"
           limits:
-            cpu: "32"
-            memory: "120Gi"
+            cpu: "64"
+            memory: "256Gi"
+            ephemeral-storage: "1Ti"
         env:
+        - name: TMPDIR
+          value: "/tmp"
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -58,11 +69,16 @@ spec:
             secretKeyRef:
               name: wetlands-outputs
               key: AWS_SECRET_ACCESS_KEY
+        volumeMounts:
+        - name: temp-storage
+          mountPath: /tmp
       
       volumes:
       - name: nginx-config
         configMap:
           name: mcp-nginx-cors-config
+      - name: temp-storage
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: ConfigMap

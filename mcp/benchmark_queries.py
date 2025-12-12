@@ -5,69 +5,82 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 QUERIES = {
     "Count wetlands by category": """
 SET THREADS=100;
+SET preserve_insertion_order=false;
+SET enable_object_cache=true;
+SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
-CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_STYLE 'path');
+INSTALL h3 FROM community; LOAD h3;
+CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
+    URL_STYLE 'path', USE_SSL 'false', KEY_ID '', SECRET '');
+CREATE OR REPLACE SECRET outputs (
+    TYPE S3, ENDPOINT 'minio.carlboettiger.info',
+    URL_STYLE 'path', SCOPE 's3://public-outputs'
+);
 
-SELECT 
-    c.category,
-    COUNT(*) as hex_count,
-    ROUND(hex_count * 73.7327598, 2) as area_hectares,
-    ROUND(hex_count * 0.737327598, 2) as area_km2
+SELECT c.category, COUNT(*) as hex_count,
+    ROUND(hex_count * 73.7327598, 2) as area_hectares
 FROM read_parquet('s3://public-wetlands/glwd/hex/**') w
 JOIN read_csv('s3://public-wetlands/glwd/category_codes.csv') c ON w.Z = c.Z
-WHERE w.Z > 0
-GROUP BY c.category
-ORDER BY area_km2 DESC;
+WHERE w.Z > 0 GROUP BY c.category ORDER BY area_hectares DESC;
 """,
-    "Calculate vulnerable carbon in India": """
+    "Carbon in India's wetlands": """
 SET THREADS=100;
+SET preserve_insertion_order=false;
+SET enable_object_cache=true;
+SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
-CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_STYLE 'path');
+INSTALL h3 FROM community; LOAD h3;
+CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
+    URL_STYLE 'path', USE_SSL 'false', KEY_ID '', SECRET '');
+CREATE OR REPLACE SECRET outputs (
+    TYPE S3, ENDPOINT 'minio.carlboettiger.info',
+    URL_STYLE 'path', SCOPE 's3://public-outputs'
+);
 
-SELECT 
-    c.name as wetland_type,
-    COUNT(*) as hex_count,
-    ROUND(SUM(carb.carbon), 2) as total_carbon,
-    ROUND(hex_count * 73.7327598, 2) as area_hectares
+SELECT c.name, COUNT(*) as hex_count, ROUND(SUM(carb.carbon), 2) as total_carbon
 FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') ctry
 JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w ON ctry.h8 = w.h8 AND ctry.h0 = w.h0
 JOIN read_parquet('s3://public-carbon/hex/vulnerable-carbon/**') carb ON w.h8 = carb.h8 AND w.h0 = carb.h0
 JOIN read_csv('s3://public-wetlands/glwd/category_codes.csv') c ON w.Z = c.Z
-WHERE ctry.country = 'IN'
-GROUP BY c.name
-ORDER BY total_carbon DESC;
+WHERE ctry.country = 'IN' GROUP BY c.name ORDER BY total_carbon DESC;
 """,
-    "Calculate total peatland area": """
+    "Bird species in Costa Rica forested wetlands": """
 SET THREADS=100;
+SET preserve_insertion_order=false;
+SET enable_object_cache=true;
+SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
-CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_STYLE 'path');
+INSTALL h3 FROM community; LOAD h3;
+CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
+    URL_STYLE 'path', USE_SSL 'false', KEY_ID '', SECRET '');
+CREATE OR REPLACE SECRET outputs (
+    TYPE S3, ENDPOINT 'minio.carlboettiger.info',
+    URL_STYLE 'path', SCOPE 's3://public-outputs'
+);
 
-SELECT 
-    'Peatlands (codes 22-27)' as wetland_group,
-    COUNT(*) as total_hexagons,
-    ROUND(total_hexagons * 73.7327598, 2) as total_hectares,
-    ROUND(total_hexagons * 0.737327598, 2) as total_km2,
-    ROUND(total_hexagons * 0.284679, 2) as total_sq_miles
-FROM read_parquet('s3://public-wetlands/glwd/hex/**')
-WHERE Z BETWEEN 22 AND 27;
-""",
-    "Evaluate wetlands by NCP in Australia": """
-SET THREADS=100;
-INSTALL httpfs; LOAD httpfs;
-CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'minio.carlboettiger.info', URL_STYLE 'path');
-
-SELECT 
-    r.name as region_name,
-    COUNT(*) as wetland_hex_count,
-    ROUND(COUNT(*) * 73.7327598, 2) as wetland_area_hectares,
-    ROUND(AVG(n.ncp), 3) as avg_ncp_score
-FROM read_parquet('s3://public-overturemaps/hex/regions/**') r
-JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w ON r.h8 = w.h8 AND r.h0 = w.h0
-JOIN read_parquet('s3://public-ncp/hex/ncp_biod_nathab/**') n ON w.h8 = n.h8 AND w.h0 = n.h0
-WHERE r.country = 'AU'
-GROUP BY r.name
-ORDER BY avg_ncp_score DESC
-LIMIT 10;
+COPY (
+  SELECT 
+      t.scientificName,
+      t.vernacularName as common_name,
+      t.family,
+      t.order,
+      COUNT(DISTINCT w.h8) as wetland_hexagons,
+      ROUND(COUNT(DISTINCT w.h8) * 73.7327598, 2) as area_hectares
+  FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') c
+  JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
+      ON c.h8 = w.h8 AND c.h0 = w.h0
+  JOIN read_parquet('s3://public-inat/hexagon/**') pos 
+      ON h3_cell_to_parent(w.h8, 4) = pos.h4 AND w.h0 = pos.h0
+  JOIN read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet') t
+      ON pos.taxon_id = t.id
+  WHERE c.country = 'CR'
+  AND w.Z IN (8, 10, 12, 14, 16, 18, 20, 22, 24, 26)
+  AND t.class = 'Aves'
+  AND pos.rank = 'species'
+  GROUP BY t.scientificName, t.vernacularName, t.family, t.order
+  ORDER BY wetland_hexagons DESC
+) TO 's3://public-outputs/wetlands/cr_forested_wetland_birds.csv'
+(FORMAT CSV, HEADER, OVERWRITE_OR_IGNORE);
 """
 }
 

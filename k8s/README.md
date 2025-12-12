@@ -32,26 +32,161 @@ kubectl rollout restart deployment/wetlands-maplibre
 
 The init container will clone the latest version of the repository on each pod restart.
 
+### Update Configuration
+
+If you modify the ConfigMap (`configmap-nginx.yaml`), you need to:
+
+1. Apply the updated ConfigMap:
+   ```bash
+   kubectl apply -f k8s/configmap-nginx.yaml
+   ```
+
+2. Restart the deployment to pick up the changes:
+   ```bash
+   kubectl rollout restart deployment wetlands-maplibre
+   ```
+
+3. Check the rollout status:
+   ```bash
+   kubectl rollout status deployment wetlands-maplibre
+   ```
+
+**Note:** ConfigMap changes don't automatically trigger pod restarts. You must manually restart the deployment for pods to pick up the new configuration.
+
 ## Access
 
 After deployment, the website will be available at:
 - Internal: http://wetlands-maplibre.default.svc.cluster.local
 - External: https://wetlands.nrp-nautilus.io
 
-## Environment Variables
+## Configuration
+
+The application uses a two-layer configuration approach:
+
+1. **ConfigMap** (`wetlands-maplibre-config`) - Contains the config template with placeholders
+2. **Secrets** (`llm-proxy-secrets`) - Contains the shared API key for the LLM proxy
+
+### Environment Variables
 
 The deployment injects these environment variables into the runtime config:
 
-- `LLM_ENDPOINT` - LLM proxy base URL (https://llm-proxy.nrp-nautilus.io/v1)
-- `LLM_MODEL` - Model to use (kimi)
-- `MCP_SERVER_URL` - MCP server SSE endpoint (https://biodiversity-mcp.nrp-nautilus.io/sse)
-- `PROXY_KEY` - Authentication key for accessing the LLM proxy (from `llm-proxy-secrets`)
+- `MCP_SERVER_URL` - MCP server SSE endpoint (default: https://biodiversity-mcp.nrp-nautilus.io/sse)
+- `LLM_ENDPOINT` - Shared LLM proxy base URL (default: https://llm-proxy.nrp-nautilus.io/v1)
+- `DEFAULT_LLM_MODEL` - Default model to use (default: kimi)
+- `PROXY_KEY` - Shared API key for all models using the same endpoint (from `llm-proxy-secrets`)
 
-**Note:** The LLM proxy requires two keys:
-1. `PROXY_KEY` - Client authentication (from app to proxy)
-2. `NRP_API_KEY` - LLM endpoint authentication (from proxy to actual LLM)
+### Setting up Secrets
 
-Both keys are stored in the `llm-proxy-secrets` Kubernetes secret. The `config.json` is generated at container startup by substituting environment variables into a template.
+The deployment requires two secrets:
+
+1. **LLM Proxy Key** (`llm-proxy-secrets`):
+   ```bash
+   # Copy the example secrets file
+   cp k8s/secrets.yaml.example k8s/secrets.yaml
+   
+   # Edit k8s/secrets.yaml and replace the placeholder with your actual API key
+   # Then apply:
+   kubectl apply -f k8s/secrets.yaml
+   ```
+   
+   **Note:** Since all models in this example use the same endpoint, they share the same API key. Use `"EMPTY"` if no authentication is required.
+
+2. **Nimbus API Key** (`nimbus-api-key`):
+   ```bash
+   # Create the nimbus secret directly (or use create-nimbus-secret.sh)
+   kubectl create secret generic nimbus-api-key \
+     --from-literal=iNIMBUS_API_KEY="your-nimbus-key-here"
+   
+   # Or use the provided script:
+   ./k8s/create-nimbus-secret.sh
+   ```
+
+### Updating Secrets
+
+To update an existing secret:
+
+```bash
+# Delete the old secret
+kubectl delete secret llm-proxy-secrets
+
+# Recreate with new values
+kubectl apply -f k8s/secrets.yaml
+
+# Restart deployment to use new secret
+kubectl rollout restart deployment wetlands-maplibre
+```
+
+**Important:** Changing secrets requires a deployment restart, as pods don't automatically reload secret values.
+
+### Per-Model Endpoints and Keys
+
+If you need different endpoints or API keys for different models:
+
+1. Edit the ConfigMap template in `configmap-nginx.yaml` to use different environment variables per model
+2. Add corresponding environment variables and secrets in `deployment.yaml`
+3. Update the secrets to include the additional keys
+
+**Note:** The configuration template is injected at pod startup using `envsubst`, substituting environment variables from the ConfigMap and Secrets into the final `config.json` served to the browser.
+
+## Deployment Order
+
+To deploy everything in the correct order:
+
+```bash
+# 1. Create secrets first
+# Edit secrets.yaml with your actual proxy key
+kubectl apply -f k8s/secrets.yaml
+
+# Create nimbus API key secret
+kubectl create secret generic nimbus-api-key \
+  --from-literal=iNIMBUS_API_KEY="your-nimbus-key-here"
+
+# 2. Apply ConfigMaps
+kubectl apply -f k8s/configmap-nginx.yaml
+
+# 3. Deploy the application
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+## Common Workflows
+
+### Adding a New Model
+
+1. Edit `k8s/configmap-nginx.yaml` to add the model to the `llm_models` array:
+   ```json
+   {
+     "value": "new-model",
+     "label": "New Model Name",
+     "endpoint": "${LLM_ENDPOINT}",
+     "api_key": "${PROXY_KEY}"
+   }
+   ```
+
+2. Apply the updated ConfigMap and restart:
+   ```bash
+   kubectl apply -f k8s/configmap-nginx.yaml
+   kubectl rollout restart deployment wetlands-maplibre
+   ```
+
+### Changing the Default Model
+
+1. Update the `llm_model` value in `k8s/configmap-nginx.yaml`
+2. Apply changes:
+   ```bash
+   kubectl apply -f k8s/configmap-nginx.yaml
+   kubectl rollout restart deployment wetlands-maplibre
+   ```
+
+### Updating MCP Server URL
+
+1. Edit the `MCP_SERVER_URL` environment variable in `k8s/deployment.yaml`
+2. Apply the updated deployment:
+   ```bash
+   kubectl apply -f k8s/deployment.yaml
+   ```
+   (This will trigger an automatic rollout)
 
 ## Monitoring
 

@@ -12,8 +12,8 @@ metadata:
     # Allow POST (for LLM requests), GET (for health checks), and OPTIONS (for preflight)
     haproxy.org/cors-allow-methods: "GET, POST, OPTIONS"
     
-    # Allow necessary headers (removed Authorization since we're not using proxy auth token)
-    haproxy.org/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Accept,Accept-Encoding,Accept-Language,Connection,Host,Origin,Referer,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site,Priority"
+    # Allow necessary headers including Authorization for API key
+    haproxy.org/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Accept,Accept-Encoding,Accept-Language,Connection,Host,Origin,Referer,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site,Priority,Authorization"
     
     # Expose headers in responses
     haproxy.org/cors-expose-headers: "Content-Length,Content-Range"

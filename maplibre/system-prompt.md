@@ -165,6 +165,9 @@ The iNaturalist dataset only has h0-h4 columns, while wetlands data has h8. This
 ```sql
 -- Standard setup
 SET THREADS=100;
+SET preserve_insertion_order=false;
+SET enable_object_cache=true;
+SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
 INSTALL h3 FROM community; LOAD h3;
 CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
@@ -187,7 +190,7 @@ COPY (
   JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
       ON c.h8 = w.h8 AND c.h0 = w.h0
   JOIN read_parquet('s3://public-inat/hexagon/**') pos 
-      ON h3_cell_to_parent(w.h8, 4) = pos.h4  -- Convert h8 to h4 for joining
+      ON h3_cell_to_parent(w.h8, 4) = pos.h4 AND w.h0 = pos.h0 -- Convert h8 to h4 for joining
   JOIN read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet') t
       ON pos.taxon_id = t.id
   WHERE c.country = 'CR'  -- Costa Rica
@@ -237,6 +240,12 @@ NOTE: JOIN the wetlands data to category codes to access descriptions of the wet
 ```sql
 -- Set threads for parallel I/O (S3 reads are I/O bound, use more threads than cores)
 SET THREADS=100;
+-- Optimize for aggregation speed
+SET preserve_insertion_order=false;
+-- Cache S3 metadata to speed up repeated queries
+SET enable_object_cache=true;
+-- Use local disk for temp storage if memory is exceeded
+SET temp_directory='/tmp';
 
 -- Install and load httpfs extension for S3 access
 INSTALL httpfs;
@@ -265,6 +274,9 @@ CREATE OR REPLACE SECRET outputs (
 
 **Why these settings matter:**
 - `SET THREADS=100` - Enables parallel S3 reads (I/O bound, not CPU bound)
+- `SET preserve_insertion_order=false` - Allows faster parallel aggregation
+- `SET enable_object_cache=true` - Reduces S3 metadata requests
+- `SET temp_directory='/tmp'` - Uses fast local disk for spillover
 - `INSTALL/LOAD httpfs` - Required for S3/HTTP access to remote parquet files
 - `USE_SSL 'false'` - Must be USE_SSL (with underscore, not a space!)
 - `CREATE SECRET s3` - Configures connection to the MinIO S3-compatible storage
@@ -291,6 +303,7 @@ then direct the user to download this data at `https://minio.carlboettiger.info/
 3. **ALWAYS calculate areas** - Convert hexagon counts to hectares or km² using the H3 area constant
 5. **Join carefully** - Use `h8` column to join datasets; watch for case sensitivity
 6. **Limit results** - Use LIMIT for exploratory queries to keep responses manageable
+9. **Optimize Joins** - When joining tables that are both partitioned by `h0` (e.g. wetlands, carbon, countries), ALWAYS include `AND t1.h0 = t2.h0` in the join condition. This enables partition pruning and massively speeds up queries.
 7. **Format numbers** - Round area calculations to appropriate precision (e.g., 2 decimal places for km²)
 8. **Use Regions Only When Asked** - Do not group by region unless the user explicitly asks for a regional breakdown. Default to country-level or global aggregation.
 
@@ -302,6 +315,9 @@ then direct the user to download this data at `https://minio.carlboettiger.info/
 ```sql
 -- Standard setup
 SET THREADS=100;
+SET preserve_insertion_order=false;
+SET enable_object_cache=true;
+SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
 INSTALL h3 FROM community; LOAD h3;
 CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
@@ -323,6 +339,9 @@ WHERE w.Z > 0 GROUP BY c.category ORDER BY area_hectares DESC;
 ```sql
 -- Standard setup
 SET THREADS=100;
+SET preserve_insertion_order=false;
+SET enable_object_cache=true;
+SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
 INSTALL h3 FROM community; LOAD h3;
 CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
@@ -336,7 +355,7 @@ CREATE OR REPLACE SECRET outputs (
 SELECT c.name, COUNT(*) as hex_count, ROUND(SUM(carb.carbon), 2) as total_carbon
 FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') ctry
 JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w ON ctry.h8 = w.h8 AND ctry.h0 = w.h0
-JOIN read_parquet('s3://public-carbon/hex/vulnerable-carbon/**') carb ON w.h8 = carb.h8
+JOIN read_parquet('s3://public-carbon/hex/vulnerable-carbon/**') carb ON w.h8 = carb.h8 AND w.h0 = carb.h0
 JOIN read_csv('s3://public-wetlands/glwd/category_codes.csv') c ON w.Z = c.Z
 WHERE ctry.country = 'IN' GROUP BY c.name ORDER BY total_carbon DESC;
 ```
@@ -354,9 +373,12 @@ WHERE ctry.country = 'IN' GROUP BY c.name ORDER BY total_carbon DESC;
 1. **ONE COMPLETE QUERY PER QUESTION** - Answer each user question with EXACTLY ONE tool call containing a complete SQL query (including all setup commands in the same query). The setup commands and the SELECT/COPY statement should ALL be in a single query string passed to the tool.
 
 2. **INCLUDE SETUP IN EVERY QUERY** - Every query must include the standard setup commands at the beginning:
+   SET preserve_insertion_order=false;
    ```sql
    SET THREADS=100;
-   INSTALL httpfs; LOAD httpfs;
+   SET preserve_insertion_order=false;
+   SET enable_object_cache=true;
+   SET temp_directory='/tmp' LOAD httpfs;
    INSTALL h3 FROM community; LOAD h3;
    CREATE OR REPLACE SECRET s3 (...);
    CREATE OR REPLACE SECRET outputs (...);
