@@ -89,6 +89,17 @@ class WetlandsChatbot {
     }
 
     initializeUI() {
+        // Configure marked to use highlight.js
+        if (window.marked && window.hljs) {
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                    return hljs.highlight(code, { language }).value;
+                },
+                langPrefix: 'hljs language-'
+            });
+        }
+
         // Chat container
         const container = document.createElement('div');
         container.id = 'chat-container';
@@ -181,14 +192,19 @@ class WetlandsChatbot {
 
                 const codeDiv = document.createElement('pre');
                 codeDiv.style.marginTop = '8px';
-                codeDiv.style.background = 'rgba(0, 0, 0, 0.1)';
-                codeDiv.style.padding = '8px';
+                codeDiv.style.padding = '0';
                 codeDiv.style.borderRadius = '4px';
                 codeDiv.style.overflowX = 'auto';
 
                 const codeElement = document.createElement('code');
+                codeElement.className = 'language-sql';
                 codeElement.textContent = sqlQuery;
                 codeDiv.appendChild(codeElement);
+
+                // Apply syntax highlighting if available
+                if (window.hljs) {
+                    window.hljs.highlightElement(codeElement);
+                }
 
                 detailsDiv.appendChild(summaryDiv);
                 detailsDiv.appendChild(codeDiv);
@@ -224,7 +240,7 @@ class WetlandsChatbot {
                 content += `
                     <details open>
                         <summary style="cursor: pointer; user-select: none;">📝 View SQL Query</summary>
-                        <pre style="margin-top: 8px; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; overflow-x: auto;"><code>${this.escapeHtml(sqlQuery)}</code></pre>
+                        <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
                     </details>
                 `;
 
@@ -240,6 +256,14 @@ class WetlandsChatbot {
 
             proposalDiv.innerHTML = content;
             messagesDiv.appendChild(proposalDiv);
+
+            // Apply syntax highlighting
+            if (window.hljs) {
+                proposalDiv.querySelectorAll('code').forEach(block => {
+                    window.hljs.highlightElement(block);
+                });
+            }
+
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
             // Re-enable input so user can type new question to interrupt
@@ -468,7 +492,7 @@ class WetlandsChatbot {
 
         // Detect GPT-OSS model for conditional API usage
         const isGptOss = this.selectedModel === 'nimbus' || modelConfig.value === 'nimbus';
-        
+
         // Build full endpoint URL
         let endpoint = modelConfig.endpoint;
         if (isGptOss) {
@@ -551,7 +575,7 @@ class WetlandsChatbot {
                     if (msg.role === 'tool') return `Tool Result: ${msg.content}`;
                     return '';
                 }).filter(Boolean).join('\n\n');
-                
+
                 requestPayload = {
                     model: this.selectedModel,
                     input: inputText,
@@ -603,16 +627,16 @@ class WetlandsChatbot {
 
             const data = await response.json();
             let message;
-            
+
             if (isGptOss) {
                 // Parse Responses API format
                 // GPT-OSS returns output array with text and function_call items
                 const output = data.output || [];
-                
+
                 // Extract text content
                 const textItems = output.filter(item => item.type === 'text');
                 const content = textItems.map(item => item.text).join('');
-                
+
                 // Extract function calls
                 const functionCallItems = output.filter(item => item.type === 'function_call');
                 const toolCalls = functionCallItems.map(item => ({
@@ -623,7 +647,7 @@ class WetlandsChatbot {
                         arguments: JSON.stringify(item.arguments)
                     }
                 }));
-                
+
                 message = {
                     role: 'assistant',
                     content: content || null,
