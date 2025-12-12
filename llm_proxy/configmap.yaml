@@ -10,29 +10,30 @@ data:
     API key is stored in environment variable, never exposed to browser
     Requires authentication token to prevent unauthorized use
     """
-
+    
     from fastapi import FastAPI, HTTPException, Header, Request, Response
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel
     import httpx
     import os
     from typing import List, Dict, Any, Optional
-
+    
     app = FastAPI(title="LLM Proxy for Wetlands Chatbot")
-
-    # Enable CORS - only allow requests from GitHub Pages site
+    
+    # Enable CORS - allow requests from GitHub Pages and k8s deployment
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
             "https://cboettig.github.io",
             "https://boettiger-lab.github.io",
+            "https://wetlands.nrp-nautilus.io",  # K8s deployment
             "http://localhost:8000",  # For local testing
         ],
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],  # Allow all headers to prevent preflight failures
     )
-
+    
     # Get configuration from environment
     def get_llm_endpoint():
         endpoint = os.getenv("LLM_ENDPOINT")
@@ -44,26 +45,43 @@ data:
             endpoint = endpoint + "/chat/completions"
         print(f"LLM_ENDPOINT set to: {endpoint}")
         return endpoint
-
+    
     LLM_ENDPOINT = get_llm_endpoint()
     LLM_API_KEY = os.getenv("NRP_API_KEY")
-
+    PROXY_KEY = os.getenv("PROXY_KEY")  # Key required from clients
+    
     if not LLM_API_KEY:
         print("WARNING: NRP_API_KEY environment variable not set!")
-
+    if not PROXY_KEY:
+        print("WARNING: PROXY_KEY environment variable not set!")
+    
     class ChatRequest(BaseModel):
         messages: List[Dict[str, Any]]  # Accept any message format from OpenAI API
         tools: Optional[List[Dict[str, Any]]] = None
         tool_choice: Optional[str] = "auto"
         model: Optional[str] = "gpt-4"
         temperature: Optional[float] = 0.7
-
-    @app.post("/chat")
-    async def proxy_chat(request: ChatRequest):
+    
+    @app.post("/v1/chat/completions")
+    @app.post("/chat")  # Keep for backward compatibility
+    async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header(None)):
         """
         Proxy chat requests to LLM endpoint with API key from environment
-        Access controlled via ingress CORS rules
+        Requires client to provide PROXY_KEY via Authorization header
+        API keys: PROXY_KEY (client auth) and NRP_API_KEY (LLM endpoint auth)
+        Supports standard OpenAI-compatible path: /v1/chat/completions
         """
+        # Check client authorization
+        if not PROXY_KEY:
+            raise HTTPException(status_code=500, detail="PROXY_KEY not configured on server")
+        
+        client_key = None
+        if authorization:
+            client_key = authorization.replace('Bearer ', '').strip()
+        
+        if not client_key or client_key != PROXY_KEY:
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid or missing proxy key")
+        
         if not LLM_API_KEY:
             raise HTTPException(status_code=500, detail="NRP_API_KEY not configured on server")
         
@@ -94,11 +112,11 @@ data:
             payload["tool_choice"] = request.tool_choice
             print(f"Added tools to payload, tool_choice: {request.tool_choice}")
         
-        # Make request to LLM with extended timeout (some models are very slow)
+        # Make request to LLM
         print(f"Sending request to LLM...")
         import time
         start_time = time.time()
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minutes timeout
+        async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minutes to match ingress timeout
             try:
                 print(f"Calling httpx.post...")
                 response = await client.post(LLM_ENDPOINT, json=payload, headers=headers)
@@ -111,9 +129,17 @@ data:
                 print(f"Response parsed successfully, has {len(str(result))} chars")
                 # Log message content for debugging
                 if 'choices' in result and len(result['choices']) > 0:
-                    msg_content = result['choices'][0].get('message', {}).get('content')
+                    message = result['choices'][0].get('message', {})
+                    msg_content = message.get('content')
+                    tool_calls = message.get('tool_calls')
+                    
                     print(f"🔍 LLM Response message content: {msg_content[:200] if msg_content else 'NULL/EMPTY'}")
                     print(f"🔍 LLM Response message content length: {len(msg_content) if msg_content else 0}")
+                    
+                    if tool_calls:
+                        print(f"🔧 LLM Response includes tool_calls: {len(tool_calls)} calls")
+                        for i, tc in enumerate(tool_calls):
+                            print(f"🔧   Tool call {i+1}: {tc.get('function', {}).get('name')} - args: {tc.get('function', {}).get('arguments', '')[:100]}")
                 return result
             except httpx.TimeoutException as e:
                 elapsed = time.time() - start_time
@@ -130,16 +156,8 @@ data:
                 print(f"ERROR Exception: {error_detail}")
                 import traceback
                 traceback.print_exc()
-                raise HTTPException(status_code=504, detail=error_detail)
-            except httpx.HTTPStatusError as e:
-                error_detail = f"LLM API returned {e.response.status_code}: {e.response.text}"
-                print(f"ERROR: {error_detail}")
                 raise HTTPException(status_code=500, detail=error_detail)
-            except Exception as e:
-                error_detail = f"LLM request failed: {type(e).__name__}: {str(e)}"
-                print(f"ERROR: {error_detail}")
-                raise HTTPException(status_code=500, detail=error_detail)
-
+    
     @app.post("/llm")
     async def proxy_llm(request: Request):
         """Generic LLM endpoint proxy"""
@@ -150,7 +168,7 @@ data:
         # Add API key
         headers["Authorization"] = f"Bearer {LLM_API_KEY}"
         
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minutes timeout
+        async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minutes to match ingress timeout
             try:
                 resp = await client.post(LLM_ENDPOINT, content=body, headers=headers)
                 return Response(
@@ -161,17 +179,17 @@ data:
             except Exception as e:
                 print(f"ERROR in /llm endpoint: {type(e).__name__}: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
-
+    
     @app.options("/llm")
     async def options_llm():
         """Handle CORS preflight for /llm endpoint"""
         return Response(status_code=204)
-
+    
     @app.options("/chat")
     async def options_chat():
         """Handle CORS preflight for /chat endpoint"""
         return Response(status_code=204)
-
+    
     @app.get("/health")
     async def health_check():
         """Health check endpoint"""
@@ -180,7 +198,7 @@ data:
             "llm_endpoint": LLM_ENDPOINT,
             "api_key_configured": bool(LLM_API_KEY)
         }
-
+    
     @app.get("/")
     async def root():
         """Root endpoint"""
@@ -192,7 +210,8 @@ data:
                 "/health": "GET - Health check"
             }
         }
-
+    
     if __name__ == "__main__":
         import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=8002)
+    

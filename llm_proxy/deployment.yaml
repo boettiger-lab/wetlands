@@ -32,6 +32,11 @@ spec:
             secretKeyRef:
               name: llm-proxy-secrets
               key: nrp-api-key
+        - name: PROXY_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-proxy-secrets
+              key: proxy-key
         - name: LLM_ENDPOINT
           value: "https://ellm.nrp-nautilus.io/v1"
         resources:

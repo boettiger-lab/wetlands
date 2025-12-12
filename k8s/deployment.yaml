@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wetlands-maplibre
+  labels:
+    app: wetlands-maplibre
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: wetlands-maplibre
+  template:
+    metadata:
+      labels:
+        app: wetlands-maplibre
+    spec:
+      initContainers:
+      - name: git-clone
+        image: alpine/git:latest
+        command:
+        - sh
+        - -c
+        - |
+          git clone --depth 1 https://github.com/boettiger-lab/wetlands.git /tmp/repo
+          cp -r /tmp/repo/maplibre/* /usr/share/nginx/html/
+          # Create a template for runtime config injection
+          cat > /usr/share/nginx/html/config.runtime.json << 'EOF'
+          {
+            "mcp_server_url": "${MCP_SERVER_URL}",
+            "llm_endpoint": "${LLM_ENDPOINT}",
+            "llm_model": "${LLM_MODEL}",
+            "proxy_key": "${PROXY_KEY}"
+          }
+          EOF
+        volumeMounts:
+        - name: website-content
+          mountPath: /usr/share/nginx/html
+      containers:
+      - name: wetlands-maplibre
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        env:
+        - name: MCP_SERVER_URL
+          value: "https://biodiversity-mcp.nrp-nautilus.io/sse"
+        - name: LLM_ENDPOINT
+          value: "https://llm-proxy.nrp-nautilus.io/v1"
+        - name: LLM_MODEL
+          value: "kimi"
+        - name: PROXY_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-proxy-secrets
+              key: proxy-key
+        command:
+        - sh
+        - -c
+        - |
+          # Install envsubst for environment variable substitution
+          apk add --no-cache gettext
+          # Substitute environment variables in config template
+          envsubst < /usr/share/nginx/html/config.runtime.json > /usr/share/nginx/html/config.json
+          # Start nginx
+          nginx -g 'daemon off;'
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        volumeMounts:
+        - name: website-content
+          mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: nginx.conf
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: website-content
+        emptyDir: {}
+      - name: nginx-config
+        configMap:
+          name: wetlands-maplibre-nginx

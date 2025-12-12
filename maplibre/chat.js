@@ -107,7 +107,7 @@ class WetlandsChatbot {
         document.getElementById('chat-toggle').addEventListener('click', () => this.toggleChat());
         document.getElementById('chat-send').addEventListener('click', () => this.sendMessage());
         document.getElementById('chat-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMessage();
+            if (e.key === 'Enter' && !e.shiftKey) this.sendMessage();
         });
         document.getElementById('model-selector').addEventListener('change', (e) => {
             this.selectedModel = e.target.value;
@@ -184,55 +184,112 @@ class WetlandsChatbot {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    // Add a progress message showing SQL query execution
-    addProgressMessage(queryNumber, sqlQuery, description = null, status = 'executing') {
+    // Show a tool call proposal and wait for user approval
+    async showToolCallProposal(toolCalls, iterationNumber) {
+        return new Promise((resolve) => {
+            const messagesDiv = document.getElementById('chat-messages');
+
+            const proposalDiv = document.createElement('div');
+            proposalDiv.className = 'chat-message tool-proposal';
+
+            let content = `<div class="tool-proposal-header"><strong>🔧 Tool Call Proposed (Step ${iterationNumber})</strong></div>`;
+
+            toolCalls.forEach((toolCall, index) => {
+                const functionArgs = JSON.parse(toolCall.function.arguments);
+                const sqlQuery = functionArgs.query || 'No query provided';
+
+                content += `
+                    <div class="tool-call-item">
+                        <div class="tool-call-name"><strong>Tool:</strong> ${toolCall.function.name}</div>
+                `;
+
+                // Show SQL query in collapsible section
+                const detailsId = `tool-proposal-${iterationNumber}-${index}`;
+                content += `
+                    <details open>
+                        <summary style="cursor: pointer; user-select: none;">📝 View SQL Query</summary>
+                        <pre style="margin-top: 8px; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; overflow-x: auto;"><code>${this.escapeHtml(sqlQuery)}</code></pre>
+                    </details>
+                `;
+
+                content += `</div>`;
+            });
+
+            // Add approval button
+            content += `
+                <div class="tool-approval-buttons" style="margin-top: 12px;">
+                    <button class="approve-btn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">✓ Run Query</button>
+                </div>
+            `;
+
+            proposalDiv.innerHTML = content;
+            messagesDiv.appendChild(proposalDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Re-enable input so user can type new question to interrupt
+            const input = document.getElementById('chat-input');
+            const sendButton = document.getElementById('chat-send');
+            input.disabled = false;
+            sendButton.disabled = false;
+
+            // Handle approval
+            const approveBtn = proposalDiv.querySelector('.approve-btn');
+
+            approveBtn.addEventListener('click', () => {
+                approveBtn.disabled = true;
+                approveBtn.textContent = '⏳ Running...';
+                resolve({ approved: true, toolCalls });
+            });
+        });
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Show tool call results
+    showToolResults(results, iterationNumber) {
         const messagesDiv = document.getElementById('chat-messages');
 
-        // Create or update progress container
-        let progressContainer = document.getElementById('progress-container');
-        if (!progressContainer) {
-            progressContainer = document.createElement('div');
-            progressContainer.id = 'progress-container';
-            progressContainer.className = 'chat-message system';
-            messagesDiv.appendChild(progressContainer);
-        }
+        const resultsDiv = document.createElement('div');
+        resultsDiv.className = 'chat-message tool-results';
 
-        const progressDiv = document.createElement('div');
-        progressDiv.className = 'query-progress';
+        let content = `<div class="tool-results-header"><strong>✅ Query Results (Step ${iterationNumber})</strong></div>`;
 
-        const statusIcon = status === 'executing' ? '⏳' : '✅';
-        const statusText = status === 'executing' ? 'Executing' : 'Completed';
+        results.forEach((result, index) => {
+            content += `
+                <details>
+                    <summary style="cursor: pointer; user-select: none;">📊 Result ${index + 1}</summary>
+                    <pre style="margin-top: 8px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; overflow-x: auto; max-height: 300px;"><code>${this.escapeHtml(result.substring(0, 5000))}${result.length > 5000 ? '\n... (truncated)' : ''}</code></pre>
+                </details>
+            `;
+        });
 
-        let content = `<strong>${statusIcon} ${statusText} Query ${queryNumber}</strong>`;
-
-        // Add description if provided
-        if (description) {
-            content += `<div class="description">${description}</div>`;
-        }
-
-        progressDiv.innerHTML = content;
-
-        // Add SQL details (OPEN by default so queries are immediately visible)
-        const detailsDiv = document.createElement('details');
-        detailsDiv.open = true; // Show SQL by default
-
-        const summaryDiv = document.createElement('summary');
-        summaryDiv.textContent = '🔍 SQL Query';
-
-        const codeDiv = document.createElement('pre');
-
-        const codeElement = document.createElement('code');
-        codeElement.textContent = sqlQuery;
-        codeDiv.appendChild(codeElement);
-
-        detailsDiv.appendChild(summaryDiv);
-        detailsDiv.appendChild(codeDiv);
-        progressDiv.appendChild(detailsDiv);
-
-        progressContainer.appendChild(progressDiv);
+        resultsDiv.innerHTML = content;
+        messagesDiv.appendChild(resultsDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
 
-        return progressDiv;
+    // Ask if user wants to continue with another tool call
+    async askContinue(iterationNumber) {
+        return new Promise((resolve) => {
+            const messagesDiv = document.getElementById('chat-messages');
+
+            const continueDiv = document.createElement('div');
+            continueDiv.className = 'chat-message assistant';
+            continueDiv.innerHTML = `
+                <p><strong>LLM is processing results...</strong></p>
+                <p style="font-size: 12px; opacity: 0.7;">Iteration ${iterationNumber} complete. Sending results back to LLM for interpretation or next step...</p>
+            `;
+
+            messagesDiv.appendChild(continueDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Auto-continue after showing message
+            setTimeout(() => resolve(true), 500);
+        });
     }
 
     // Show thinking indicator immediately
@@ -345,32 +402,37 @@ class WetlandsChatbot {
         try {
             console.log('[Chat] Calling queryLLM...');
             const result = await this.queryLLM(userMessage);
-            console.log('[Chat] Got response, length:', result?.response?.length);
+            console.log('[Chat] Got response:', result);
 
-            // Clear thinking indicator only (KEEP progress messages visible)
+            // Clear thinking indicator
             this.clearThinking();
 
-            // Add assistant response (handle undefined/null)
-            const finalResponse = result.response || "I received an empty response. Please try again.";
-
-            // Debug logging for SQL queries
-            if (result.sqlQueries && result.sqlQueries.length > 0) {
-                console.log(`[Chat] ✅ ${result.sqlQueries.length} SQL queries executed`);
-                result.sqlQueries.forEach((q, i) => console.log(`[Chat]   Query ${i + 1}: ${q.substring(0, 100)}...`));
-            } else {
-                console.log('[Chat] No SQL queries executed (could be clarification, or no query needed)');
+            // Check if cancelled
+            if (result.cancelled) {
+                console.log('[Chat] User cancelled tool execution');
+                return;
             }
 
-            // Show final interpretation message without metadata (queries already shown in progress)
-            this.addMessage('assistant', finalResponse);
-            this.messages.push({ role: 'assistant', content: finalResponse });
+            // Add assistant response (handle undefined/null)
+            if (result.response) {
+                const finalResponse = result.response;
+
+                // Debug logging for SQL queries
+                if (result.sqlQueries && result.sqlQueries.length > 0) {
+                    console.log(`[Chat] ✅ ${result.sqlQueries.length} SQL queries executed`);
+                    result.sqlQueries.forEach((q, i) => console.log(`[Chat]   Query ${i + 1}: ${q.substring(0, 100)}...`));
+                }
+
+                // Show final interpretation message
+                this.addMessage('assistant', finalResponse);
+                this.messages.push({ role: 'assistant', content: finalResponse });
+            } else {
+                this.addMessage('error', "I received an empty response. Please try again.");
+            }
 
         } catch (error) {
             console.error('[Chat] Error caught:', error);
             console.error('[Chat] Error stack:', error.stack);
-
-            // Clear progress messages on error
-            this.clearProgressMessages();
 
             this.addMessage('error', `Error: ${error.message}`);
         } finally {
@@ -385,8 +447,11 @@ class WetlandsChatbot {
             return { response: "Sorry, the database connection is not available. Please refresh the page to try again." };
         }
 
-        // Use the configured endpoint directly
+        // Build full endpoint URL (base + /chat/completions)
         let endpoint = this.llmEndpoint;
+        if (!endpoint.endsWith('/chat/completions')) {
+            endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
+        }
         console.log('[LLM] Starting request to:', endpoint);
         console.log('[LLM] Origin:', window.location.origin);
 
@@ -460,11 +525,22 @@ class WetlandsChatbot {
             console.log('[LLM] Sending fetch request...');
             const startTime = Date.now();
 
+            // Prepare headers with proxy authentication
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+
+            // Add proxy authorization if configured
+            if (this.config.proxy_key) {
+                headers['Authorization'] = `Bearer ${this.config.proxy_key}`;
+                console.log('[LLM] Using proxy key from config');
+            } else {
+                console.log('[LLM] No proxy key in config');
+            }
+
             const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
                 body: JSON.stringify(requestPayload)
             });
 
@@ -488,14 +564,31 @@ class WetlandsChatbot {
                 toolCallCount++;
                 console.log(`[LLM] Tool calls requested (${toolCallCount}/${MAX_TOOL_CALLS}):`, message.tool_calls.length);
 
+                // Clear thinking indicator
+                this.clearThinking();
+
                 // SHOW PLANNING MESSAGE: Display LLM's thinking/planning text if present
                 if (message.content && message.content.trim()) {
                     console.log('[LLM] Displaying planning/reasoning message:', message.content);
-                    this.clearThinking(); // Clear "Thinking..." indicator if still present
-                    this.addMessage('assistant-thinking', message.content);
+                    this.addMessage('assistant', message.content);
                 }
 
-                // Process all tool calls in this message
+                // Show tool call proposal and wait for approval
+                const approval = await this.showToolCallProposal(message.tool_calls, toolCallCount);
+
+                if (!approval.approved) {
+                    console.log('[User] Tool call rejected by user');
+                    this.addMessage('system', 'Tool call cancelled. You can ask a different question or modify your request.');
+                    return {
+                        response: null,
+                        sqlQueries: this.currentTurnQueries,
+                        cancelled: true
+                    };
+                }
+
+                // User approved - execute all tool calls
+                const toolResults = [];
+
                 for (const toolCall of message.tool_calls) {
                     console.log('[LLM] Executing tool:', toolCall.function.name);
                     console.log('[LLM] Tool arguments:', toolCall.function.arguments);
@@ -506,37 +599,32 @@ class WetlandsChatbot {
                         functionArgs = JSON.parse(toolCall.function.arguments);
                     } catch (e) {
                         console.error('[LLM] Failed to parse tool arguments:', e);
+                        const errorMsg = "Error: Failed to parse tool arguments. Please ensure arguments are valid JSON.";
                         currentTurnMessages.push({
                             role: 'tool',
                             tool_call_id: toolCall.id,
-                            content: "Error: Failed to parse tool arguments. Please ensure arguments are valid JSON."
+                            content: errorMsg
                         });
+                        toolResults.push(errorMsg);
                         continue;
                     }
 
-                    // Capture the SQL query and add to array
+                    // Capture the SQL query
                     if (functionArgs.query) {
                         this.currentTurnQueries.push(functionArgs.query);
-                        console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured:`, functionArgs.query.substring(0, 100) + '...');
-
-                        // Clear thinking indicator when first query starts executing
-                        if (this.currentTurnQueries.length === 1) {
-                            this.clearThinking();
-                        }
-
-                        // Generate description and show progress message in UI immediately
-                        const description = this.describeQuery(functionArgs.query);
-                        this.addProgressMessage(this.currentTurnQueries.length, functionArgs.query, description, 'executing');
+                        console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
                     }
 
                     // Check if the query argument is missing or empty
                     if (!functionArgs.query || functionArgs.query.trim() === '') {
                         console.warn('[LLM] ⚠️  WARNING: Tool call missing or empty "query" argument!');
+                        const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
                         currentTurnMessages.push({
                             role: 'tool',
                             tool_call_id: toolCall.id,
-                            content: "Error: The 'query' argument was missing or empty. Please provide a valid SQL query."
+                            content: errorMsg
                         });
+                        toolResults.push(errorMsg);
                         continue;
                     }
 
@@ -546,9 +634,11 @@ class WetlandsChatbot {
                     try {
                         queryResult = await this.executeMCPQuery(functionArgs.query);
                         console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
+                        toolResults.push(queryResult);
                     } catch (err) {
                         console.error('[MCP] Execution error:', err);
                         queryResult = `Error executing query: ${err.message}`;
+                        toolResults.push(queryResult);
                     }
 
                     // Add tool result to messages
@@ -558,6 +648,12 @@ class WetlandsChatbot {
                         content: queryResult
                     });
                 }
+
+                // Show results to user
+                this.showToolResults(toolResults, toolCallCount);
+
+                // Ask if should continue
+                await this.askContinue(toolCallCount);
 
                 // Loop continues to next iteration to send tool results back to LLM
             } else {
@@ -697,7 +793,7 @@ function initializeChatbot() {
                     // Initialize with default config so UI still appears
                     chatbot = new WetlandsChatbot({
                         mcp_server_url: 'https://biodiversity-mcp.nrp-nautilus.io/sse',
-                        llm_endpoint: 'https://llm-proxy.nrp-nautilus.io/chat',
+                        llm_endpoint: 'https://llm-proxy.nrp-nautilus.io/v1',
                         llm_model: 'qwen3'
                     });
                 });

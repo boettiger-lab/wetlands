@@ -304,3 +304,39 @@
 #thinking-indicator {
     opacity: 0.7;
 }
+
+/* Tool proposal and results use same style as assistant */
+.chat-message.tool-proposal,
+.chat-message.tool-results {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.6);
+    color: #333;
+}
+
+/* Buttons for tool approval */
+.tool-approval-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.approve-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    background: #28a745;
+    color: white;
+    transition: background 0.2s;
+}
+
+.approve-btn:hover:not(:disabled) {
+    background: #218838;
+}
+
+.approve-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

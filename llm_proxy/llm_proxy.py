@@ -14,12 +14,13 @@ from typing import List, Dict, Any, Optional
 
 app = FastAPI(title="LLM Proxy for Wetlands Chatbot")
 
-# Enable CORS - only allow requests from GitHub Pages site
+# Enable CORS - allow requests from GitHub Pages and k8s deployment
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://cboettig.github.io",
         "https://boettiger-lab.github.io",
+        "https://wetlands.nrp-nautilus.io",  # K8s deployment
         "http://localhost:8000",  # For local testing
     ],
     allow_credentials=False,
@@ -41,9 +42,12 @@ def get_llm_endpoint():
 
 LLM_ENDPOINT = get_llm_endpoint()
 LLM_API_KEY = os.getenv("NRP_API_KEY")
+PROXY_KEY = os.getenv("PROXY_KEY")  # Key required from clients
 
 if not LLM_API_KEY:
     print("WARNING: NRP_API_KEY environment variable not set!")
+if not PROXY_KEY:
+    print("WARNING: PROXY_KEY environment variable not set!")
 
 class ChatRequest(BaseModel):
     messages: List[Dict[str, Any]]  # Accept any message format from OpenAI API
@@ -52,12 +56,26 @@ class ChatRequest(BaseModel):
     model: Optional[str] = "gpt-4"
     temperature: Optional[float] = 0.7
 
-@app.post("/chat")
-async def proxy_chat(request: ChatRequest):
+@app.post("/v1/chat/completions")
+@app.post("/chat")  # Keep for backward compatibility
+async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header(None)):
     """
     Proxy chat requests to LLM endpoint with API key from environment
-    Access controlled via ingress CORS rules
+    Requires client to provide PROXY_KEY via Authorization header
+    API keys: PROXY_KEY (client auth) and NRP_API_KEY (LLM endpoint auth)
+    Supports standard OpenAI-compatible path: /v1/chat/completions
     """
+    # Check client authorization
+    if not PROXY_KEY:
+        raise HTTPException(status_code=500, detail="PROXY_KEY not configured on server")
+    
+    client_key = None
+    if authorization:
+        client_key = authorization.replace('Bearer ', '').strip()
+    
+    if not client_key or client_key != PROXY_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid or missing proxy key")
+    
     if not LLM_API_KEY:
         raise HTTPException(status_code=500, detail="NRP_API_KEY not configured on server")
     
@@ -92,7 +110,7 @@ async def proxy_chat(request: ChatRequest):
     print(f"Sending request to LLM...")
     import time
     start_time = time.time()
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minutes to match ingress timeout
         try:
             print(f"Calling httpx.post...")
             response = await client.post(LLM_ENDPOINT, json=payload, headers=headers)
@@ -144,7 +162,7 @@ async def proxy_llm(request: Request):
     # Add API key
     headers["Authorization"] = f"Bearer {LLM_API_KEY}"
     
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minutes to match ingress timeout
         try:
             resp = await client.post(LLM_ENDPOINT, content=body, headers=headers)
             return Response(
