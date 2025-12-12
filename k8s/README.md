@@ -32,6 +32,27 @@ kubectl rollout restart deployment/wetlands-maplibre
 
 The init container will clone the latest version of the repository on each pod restart.
 
+### Update Configuration
+
+If you modify the ConfigMap (`configmap-nginx.yaml`), you need to:
+
+1. Apply the updated ConfigMap:
+   ```bash
+   kubectl apply -f k8s/configmap-nginx.yaml
+   ```
+
+2. Restart the deployment to pick up the changes:
+   ```bash
+   kubectl rollout restart deployment wetlands-maplibre
+   ```
+
+3. Check the rollout status:
+   ```bash
+   kubectl rollout status deployment wetlands-maplibre
+   ```
+
+**Note:** ConfigMap changes don't automatically trigger pod restarts. You must manually restart the deployment for pods to pick up the new configuration.
+
 ## Access
 
 After deployment, the website will be available at:
@@ -56,23 +77,46 @@ The deployment injects these environment variables into the runtime config:
 
 ### Setting up Secrets
 
-1. Copy the example secrets file:
-   ```bash
-   cp k8s/secrets.yaml.example k8s/secrets.yaml
-   ```
+The deployment requires two secrets:
 
-2. Edit `k8s/secrets.yaml` and replace the placeholder value with your actual API key:
-   ```yaml
-   stringData:
-     proxy-key: "your-actual-proxy-key-here"
+1. **LLM Proxy Key** (`llm-proxy-secrets`):
+   ```bash
+   # Copy the example secrets file
+   cp k8s/secrets.yaml.example k8s/secrets.yaml
+   
+   # Edit k8s/secrets.yaml and replace the placeholder with your actual API key
+   # Then apply:
+   kubectl apply -f k8s/secrets.yaml
    ```
    
    **Note:** Since all models in this example use the same endpoint, they share the same API key. Use `"EMPTY"` if no authentication is required.
 
-3. Apply the secrets:
+2. **Nimbus API Key** (`nimbus-api-key`):
    ```bash
-   kubectl apply -f k8s/secrets.yaml
+   # Create the nimbus secret directly (or use create-nimbus-secret.sh)
+   kubectl create secret generic nimbus-api-key \
+     --from-literal=iNIMBUS_API_KEY="your-nimbus-key-here"
+   
+   # Or use the provided script:
+   ./k8s/create-nimbus-secret.sh
    ```
+
+### Updating Secrets
+
+To update an existing secret:
+
+```bash
+# Delete the old secret
+kubectl delete secret llm-proxy-secrets
+
+# Recreate with new values
+kubectl apply -f k8s/secrets.yaml
+
+# Restart deployment to use new secret
+kubectl rollout restart deployment wetlands-maplibre
+```
+
+**Important:** Changing secrets requires a deployment restart, as pods don't automatically reload secret values.
 
 ### Per-Model Endpoints and Keys
 
@@ -89,8 +133,13 @@ If you need different endpoints or API keys for different models:
 To deploy everything in the correct order:
 
 ```bash
-# 1. Create secrets first (edit secrets.yaml with your actual keys)
+# 1. Create secrets first
+# Edit secrets.yaml with your actual proxy key
 kubectl apply -f k8s/secrets.yaml
+
+# Create nimbus API key secret
+kubectl create secret generic nimbus-api-key \
+  --from-literal=iNIMBUS_API_KEY="your-nimbus-key-here"
 
 # 2. Apply ConfigMaps
 kubectl apply -f k8s/configmap-nginx.yaml
@@ -100,6 +149,44 @@ kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
 kubectl apply -f k8s/ingress.yaml
 ```
+
+## Common Workflows
+
+### Adding a New Model
+
+1. Edit `k8s/configmap-nginx.yaml` to add the model to the `llm_models` array:
+   ```json
+   {
+     "value": "new-model",
+     "label": "New Model Name",
+     "endpoint": "${LLM_ENDPOINT}",
+     "api_key": "${PROXY_KEY}"
+   }
+   ```
+
+2. Apply the updated ConfigMap and restart:
+   ```bash
+   kubectl apply -f k8s/configmap-nginx.yaml
+   kubectl rollout restart deployment wetlands-maplibre
+   ```
+
+### Changing the Default Model
+
+1. Update the `llm_model` value in `k8s/configmap-nginx.yaml`
+2. Apply changes:
+   ```bash
+   kubectl apply -f k8s/configmap-nginx.yaml
+   kubectl rollout restart deployment wetlands-maplibre
+   ```
+
+### Updating MCP Server URL
+
+1. Edit the `MCP_SERVER_URL` environment variable in `k8s/deployment.yaml`
+2. Apply the updated deployment:
+   ```bash
+   kubectl apply -f k8s/deployment.yaml
+   ```
+   (This will trigger an automatic rollout)
 
 ## Monitoring
 

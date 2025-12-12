@@ -27,7 +27,9 @@ spec:
         - -c
         - |
           git clone --depth 1 https://github.com/cboettig/wetlands.git /tmp/repo
-          cp -r /tmp/repo/maplibre/* /usr/share/nginx/html/
+          # Copy all files except config.json (will be generated from template)
+          cd /tmp/repo/maplibre
+          find . -type f ! -name 'config.json' -exec cp --parents {} /usr/share/nginx/html/ \;
         volumeMounts:
         - name: website-content
           mountPath: /usr/share/nginx/html
@@ -52,7 +54,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: nimbus-api-key
-              key: iNIMBUS_API_KEY
+              key: NIMBUS_API_KEY
         command:
         - sh
         - -c
