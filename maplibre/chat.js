@@ -594,7 +594,7 @@ class WetlandsChatbot {
 
             console.log(`[LLM] Request payload (Step ${toolCallCount + 1}):`, {
                 model: requestPayload.model,
-                messageCount: requestPayload.messages.length,
+                messageCount: requestPayload.messages?.length || 'N/A (using input string)',
                 toolCount: requestPayload.tools.length
             });
 
