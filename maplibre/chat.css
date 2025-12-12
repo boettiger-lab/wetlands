@@ -338,3 +338,32 @@
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* Glass-style buttons for query fold/unfold */
+.query-summary-btn {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 6px;
+    color: #2c5282;
+    font-weight: 500;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.query-summary-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(0, 122, 255, 0.5);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.query-summary-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}

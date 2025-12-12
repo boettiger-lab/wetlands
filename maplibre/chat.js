@@ -186,7 +186,8 @@ class WetlandsChatbot {
 
                 const summaryDiv = document.createElement('summary');
                 const queryLabel = metadata.sqlQueries.length > 1 ? `Query ${index + 1}` : 'View SQL Query';
-                summaryDiv.textContent = `🔍 ${queryLabel}`;
+                summaryDiv.textContent = queryLabel;
+                summaryDiv.className = 'query-summary-btn';
                 summaryDiv.style.cursor = 'pointer';
                 summaryDiv.style.userSelect = 'none';
 
@@ -231,7 +232,7 @@ class WetlandsChatbot {
                 content += `<div class="tool-reasoning" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1);">${marked.parse(reasoning)}</div>`;
             }
 
-            content += `<div class="tool-proposal-header"><strong>🔧 Tool Call Proposed (Step ${iterationNumber})</strong></div>`;
+            content += `<div class="tool-proposal-header"><strong>Tool Call Proposed (Step ${iterationNumber})</strong></div>`;
 
             toolCalls.forEach((toolCall, index) => {
                 const functionArgs = JSON.parse(toolCall.function.arguments);
@@ -246,7 +247,7 @@ class WetlandsChatbot {
                 const detailsId = `tool-proposal-${iterationNumber}-${index}`;
                 content += `
                     <details>
-                        <summary style="cursor: pointer; user-select: none;">📝 View SQL Query</summary>
+                        <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">View SQL Query</summary>
                         <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
                     </details>
                 `;
@@ -303,12 +304,12 @@ class WetlandsChatbot {
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'chat-message tool-results';
 
-        let content = `<div class="tool-results-header"><strong>✅ Query Results (Step ${iterationNumber})</strong></div>`;
+        let content = `<div class="tool-results-header"><strong>Query Results (Step ${iterationNumber})</strong></div>`;
 
         results.forEach((result, index) => {
             content += `
                 <details>
-                    <summary style="cursor: pointer; user-select: none;">📊 Result ${index + 1}</summary>
+                    <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">Result ${index + 1}</summary>
                     <pre style="margin-top: 8px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; overflow-x: auto; max-height: 300px;"><code>${this.escapeHtml(result.substring(0, 5000))}${result.length > 5000 ? '\n... (truncated)' : ''}</code></pre>
                 </details>
             `;
