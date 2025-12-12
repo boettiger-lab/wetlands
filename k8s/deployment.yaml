@@ -26,7 +26,7 @@ spec:
         - sh
         - -c
         - |
-          git clone --depth 1 https://github.com/boettiger-lab/wetlands.git /tmp/repo
+          git clone --depth 1 https://github.com/cboettig/wetlands.git /tmp/repo
           cp -r /tmp/repo/maplibre/* /usr/share/nginx/html/
           # Create a template for runtime config injection
           cat > /usr/share/nginx/html/config.runtime.json << 'EOF'
