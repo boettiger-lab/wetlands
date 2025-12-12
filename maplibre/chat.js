@@ -92,7 +92,7 @@ class WetlandsChatbot {
         // Configure marked to use highlight.js
         if (window.marked && window.hljs) {
             marked.setOptions({
-                highlight: function(code, lang) {
+                highlight: function (code, lang) {
                     const language = hljs.getLanguage(lang) ? lang : 'plaintext';
                     return hljs.highlight(code, { language }).value;
                 },
@@ -217,14 +217,21 @@ class WetlandsChatbot {
     }
 
     // Show a tool call proposal and wait for user approval
-    async showToolCallProposal(toolCalls, iterationNumber) {
+    async showToolCallProposal(toolCalls, iterationNumber, reasoning) {
         return new Promise((resolve) => {
             const messagesDiv = document.getElementById('chat-messages');
 
             const proposalDiv = document.createElement('div');
             proposalDiv.className = 'chat-message tool-proposal';
 
-            let content = `<div class="tool-proposal-header"><strong>🔧 Tool Call Proposed (Step ${iterationNumber})</strong></div>`;
+            let content = '';
+
+            // Add reasoning if present
+            if (reasoning && reasoning.trim()) {
+                content += `<div class="tool-reasoning" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1);">${marked.parse(reasoning)}</div>`;
+            }
+
+            content += `<div class="tool-proposal-header"><strong>🔧 Tool Call Proposed (Step ${iterationNumber})</strong></div>`;
 
             toolCalls.forEach((toolCall, index) => {
                 const functionArgs = JSON.parse(toolCall.function.arguments);
@@ -238,7 +245,7 @@ class WetlandsChatbot {
                 // Show SQL query in collapsible section
                 const detailsId = `tool-proposal-${iterationNumber}-${index}`;
                 content += `
-                    <details open>
+                    <details>
                         <summary style="cursor: pointer; user-select: none;">📝 View SQL Query</summary>
                         <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
                     </details>
@@ -669,14 +676,9 @@ class WetlandsChatbot {
                 // Clear thinking indicator
                 this.clearThinking();
 
-                // SHOW PLANNING MESSAGE: Display LLM's thinking/planning text if present
-                if (message.content && message.content.trim()) {
-                    console.log('[LLM] Displaying planning/reasoning message:', message.content);
-                    this.addMessage('assistant', message.content);
-                }
-
                 // Show tool call proposal and wait for approval
-                const approval = await this.showToolCallProposal(message.tool_calls, toolCallCount);
+                // Pass message.content (reasoning) to be displayed inside the proposal
+                const approval = await this.showToolCallProposal(message.tool_calls, toolCallCount, message.content);
 
                 if (!approval.approved) {
                     console.log('[User] Tool call rejected by user');
