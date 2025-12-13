@@ -232,27 +232,18 @@ class WetlandsChatbot {
                 content += `<div class="tool-reasoning" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1);">${marked.parse(reasoning)}</div>`;
             }
 
-            content += `<div class="tool-proposal-header"><strong>Tool Call Proposed (Step ${iterationNumber})</strong></div>`;
-
             toolCalls.forEach((toolCall, index) => {
                 const functionArgs = JSON.parse(toolCall.function.arguments);
                 const sqlQuery = functionArgs.query || 'No query provided';
 
                 content += `
                     <div class="tool-call-item">
-                        <div class="tool-call-name"><strong>Tool:</strong> ${toolCall.function.name}</div>
+                        <details>
+                            <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">${toolCall.function.name}</summary>
+                            <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
+                        </details>
+                    </div>
                 `;
-
-                // Show SQL query in collapsible section
-                const detailsId = `tool-proposal-${iterationNumber}-${index}`;
-                content += `
-                    <details>
-                        <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">View SQL Query</summary>
-                        <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
-                    </details>
-                `;
-
-                content += `</div>`;
             });
 
             // Add approval button
@@ -304,12 +295,12 @@ class WetlandsChatbot {
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'chat-message tool-results';
 
-        let content = `<div class="tool-results-header"><strong>Query Results (Step ${iterationNumber})</strong></div>`;
+        let content = '';
 
         results.forEach((result, index) => {
             content += `
                 <details>
-                    <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">Result ${index + 1}</summary>
+                    <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">query result</summary>
                     <pre style="margin-top: 8px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; overflow-x: auto; max-height: 300px;"><code>${this.escapeHtml(result.substring(0, 5000))}${result.length > 5000 ? '\n... (truncated)' : ''}</code></pre>
                 </details>
             `;
@@ -328,8 +319,7 @@ class WetlandsChatbot {
             const continueDiv = document.createElement('div');
             continueDiv.className = 'chat-message assistant';
             continueDiv.innerHTML = `
-                <p><strong>LLM is processing results...</strong></p>
-                <p style="font-size: 12px; opacity: 0.7;">Iteration ${iterationNumber} complete. Sending results back to LLM for interpretation or next step...</p>
+                <p style="font-size: 14px; opacity: 0.8;">processing results...</p>
             `;
 
             messagesDiv.appendChild(continueDiv);
@@ -498,18 +488,18 @@ class WetlandsChatbot {
         // Get current model configuration
         const modelConfig = this.getCurrentModelConfig();
 
-        // Detect GPT-OSS model for conditional API usage
-        const isGptOss = this.selectedModel === 'nimbus' || modelConfig.value === 'nimbus';
+        // Check if model explicitly requests Responses API
+        const useResponsesAPI = modelConfig.use_responses_api === true;
 
         // Build full endpoint URL
         let endpoint = modelConfig.endpoint;
-        if (isGptOss) {
-            // GPT-OSS uses Responses API
+        if (useResponsesAPI) {
+            // Model explicitly configured to use Responses API
             if (!endpoint.endsWith('/responses')) {
-                endpoint = endpoint.replace(/\/$/, '') + '/v1/responses';
+                endpoint = endpoint.replace(/\/$/, '') + '/responses';
             }
         } else {
-            // Other models use Chat Completions API
+            // Default: use Chat Completions API
             if (!endpoint.endsWith('/chat/completions')) {
                 endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
             }
@@ -573,8 +563,8 @@ class WetlandsChatbot {
         while (toolCallCount < MAX_TOOL_CALLS) {
             // Build request payload - conditional format based on model
             let requestPayload;
-            if (isGptOss) {
-                // Responses API format for GPT-OSS
+            if (useResponsesAPI) {
+                // Responses API format
                 // Convert messages to a single input string
                 const inputText = currentTurnMessages.map(msg => {
                     if (msg.role === 'system') return `System: ${msg.content}`;
@@ -636,9 +626,9 @@ class WetlandsChatbot {
             const data = await response.json();
             let message;
 
-            if (isGptOss) {
+            if (useResponsesAPI) {
                 // Parse Responses API format
-                // GPT-OSS returns output array with text and function_call items
+                // Responses API returns output array with text and function_call items
                 const output = data.output || [];
 
                 // Extract text content

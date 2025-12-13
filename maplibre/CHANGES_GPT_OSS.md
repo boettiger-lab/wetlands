@@ -1,41 +1,53 @@
-# GPT-OSS Responses API Integration
+# Responses API Integration
 
 ## Summary
-Modified `chat.js` to conditionally use OpenAI's Responses API (`/v1/responses`) for the GPT-OSS model (nimbus), while maintaining Chat Completions API compatibility for all other models.
+Modified `chat.js` to support both OpenAI's Responses API (`/v1/responses`) and Chat Completions API (`/v1/chat/completions`) based on explicit configuration, rather than hardcoded model detection.
 
 ## Changes Made
 
-### 1. Model Detection & Endpoint Selection (Line 469)
-**Added:** Conditional detection of GPT-OSS model and appropriate API endpoint selection
+### 1. Configuration-Based API Selection (Line ~500)
+**Changed:** From hardcoded model name detection to explicit configuration flag
+
+Models can now opt-in to using the Responses API by setting `"use_responses_api": true` in their config:
+
+```json
+{
+    "value": "my-model",
+    "label": "My Model",
+    "endpoint": "https://api.example.com/v1",
+    "api_key": "...",
+    "use_responses_api": true
+}
+```
 
 ```javascript
-// Detect GPT-OSS model for conditional API usage
-const isGptOss = this.selectedModel === 'nimbus' || modelConfig.value === 'nimbus';
+// Check if model explicitly requests Responses API
+const useResponsesAPI = modelConfig.use_responses_api === true;
 
 // Build full endpoint URL
 let endpoint = modelConfig.endpoint;
-if (isGptOss) {
-    // GPT-OSS uses Responses API
+if (useResponsesAPI) {
+    // Model explicitly configured to use Responses API
     if (!endpoint.endsWith('/responses')) {
-        endpoint = endpoint.replace(/\/$/, '') + '/v1/responses';
+        endpoint = endpoint.replace(/\/$/, '') + '/responses';
     }
 } else {
-    // Other models use Chat Completions API
+    // Default: use Chat Completions API
     if (!endpoint.endsWith('/chat/completions')) {
         endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
     }
 }
 ```
 
-### 2. Request Payload Format (Line 542)
-**Modified:** Conditional request format based on model type
+### 2. Request Payload Format (Line ~575)
+**Modified:** Conditional request format based on configuration
 
-- **GPT-OSS (Responses API):** Uses `input` (string) instead of `messages` (array)
-- **Other Models:** Uses standard Chat Completions format with `messages` array
+- **Responses API:** Uses `input` (string) instead of `messages` (array)
+- **Chat Completions API (default):** Uses standard `messages` array format
 
 ```javascript
 let requestPayload;
-if (isGptOss) {
+if (useResponsesAPI) {
     // Responses API format - convert messages to single input string
     const inputText = currentTurnMessages.map(msg => {
         if (msg.role === 'system') return `System: ${msg.content}`;
@@ -62,17 +74,17 @@ if (isGptOss) {
 }
 ```
 
-### 3. Response Parsing (Line 604)
+### 3. Response Parsing (Line ~635)
 **Modified:** Conditional response parsing to handle different API formats
 
-- **GPT-OSS (Responses API):** Parses `output` array containing `text` and `function_call` items
-- **Other Models:** Parses standard `choices[0].message` format
+- **Responses API:** Parses `output` array containing `text` and `function_call` items
+- **Chat Completions API (default):** Parses standard `choices[0].message` format
 
 ```javascript
 const data = await response.json();
 let message;
 
-if (isGptOss) {
+if (useResponsesAPI) {
     // Parse Responses API format
     const output = data.output || [];
     
@@ -106,26 +118,50 @@ if (isGptOss) {
 
 ### API Differences
 
-| Feature | Chat Completions API | Responses API (GPT-OSS) |
-|---------|---------------------|-------------------------|
+| Feature | Chat Completions API (default) | Responses API |
+|---------|-------------------------------|---------------|
 | Endpoint | `/v1/chat/completions` | `/v1/responses` |
 | Input Format | `messages: [{role, content}]` | `input: "text string"` |
 | Output Format | `choices[0].message` | `output: [{type, ...}]` |
 | Tool Calls | `message.tool_calls[]` | `output[].type === 'function_call'` |
 | Text Content | `message.content` | `output[].type === 'text'` |
+| Configuration | Default (no flag needed) | Set `"use_responses_api": true` |
+
+### Configuration Examples
+
+**Standard Chat Completions API (default):**
+```json
+{
+    "value": "kimi",
+    "label": "Kimi",
+    "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+    "api_key": "EMPTY"
+}
+```
+
+**Responses API (explicit opt-in):**
+```json
+{
+    "value": "gpt-oss",
+    "label": "GPT-OSS",
+    "endpoint": "https://llm-proxy.nrp-nautilus.io/v1",
+    "api_key": "EMPTY",
+    "use_responses_api": true
+}
+```
+
+### Migration from Old Version
+**Old (hardcoded):** Any model with value "nimbus" automatically used Responses API
+**New (explicit):** Models must explicitly set `"use_responses_api": true` to use Responses API
 
 ### Testing
-After deployment, test with the GPT-OSS/nimbus model to verify:
+After deployment, verify:
+- ✅ Models with `use_responses_api: true` use Responses API
+- ✅ Models without this flag use Chat Completions API (default)
 - ✅ SQL queries are executed as tool calls (not returned as text)
 - ✅ Tool approval workflow functions correctly
 - ✅ Results are properly displayed to the user
-- ✅ Other models (Qwen, Llama, Kimi) still work correctly
-
-### Backup
-Original file backed up as: `chat.js.backup`
-
-To restore: `cp chat.js.backup chat.js`
 
 ---
-**Date:** December 12, 2025
-**Model:** openai/gpt-oss-120b (served as "nimbus" via vLLM)
+**Updated:** December 12, 2025
+**Change:** Replaced hardcoded model name detection with explicit configuration flag
