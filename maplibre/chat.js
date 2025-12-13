@@ -506,7 +506,7 @@ class WetlandsChatbot {
         if (isGptOss) {
             // GPT-OSS uses Responses API
             if (!endpoint.endsWith('/responses')) {
-                endpoint = endpoint.replace(/\/$/, '') + '/v1/responses';
+                endpoint = endpoint.replace(/\/$/, '') + '/responses';
             }
         } else {
             // Other models use Chat Completions API
