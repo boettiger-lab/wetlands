@@ -139,6 +139,15 @@
     font-size: 12px;
 }
 
+.chat-message.reconnecting {
+    align-self: center;
+    background: rgba(255, 193, 7, 0.3);
+    color: #856404;
+    font-size: 12px;
+    max-width: 95%;
+    border-radius: 6px;
+}
+
 #chat-input-container {
     padding: 15px;
     border-top: 1px solid rgba(255, 255, 255, 0.2);
@@ -303,6 +312,15 @@
     opacity: 0.7;
 }
 
+/* Thinking indicator when inline in tool results */
+.thinking-inline {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+    opacity: 0.7;
+}
+
 /* Tool proposal and results use same style as assistant */
 .chat-message.tool-proposal,
 .chat-message.tool-results {
@@ -371,7 +389,7 @@
     transition: transform 0.2s ease;
 }
 
-details[open] > .query-summary-btn::before {
+details[open]>.query-summary-btn::before {
     transform: translateY(-50%) rotate(180deg);
 }
 

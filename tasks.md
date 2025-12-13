@@ -1,5 +1,4 @@
-I think we may have a related problem in the maplibre/chat.js implementation that also calls the same MCP server and hits errors. Can you take a look and see if you can figure out why we get Error SSE connection failed?
 
-Can you also write a javascript test we can run locally, equivalent to the simple-mcp-server-test.py to confirm MCP is working correctly in javascript?
 
-Can you then write  a second test, with version in both python and javascript, that test MCP use in combination with the LLM tool
+
+We currently have a langchainjs based chat.js on this app that can answer questions about data shown on the map (maplibre gl, see map.js file).  I would like to add a second 'tool use' ability to the chat-bot that would allow it to update the maplibre map in various ways.  
