@@ -18,8 +18,7 @@ data:
                 "value": "nimbus",
                 "label": "Spark-gpt-oss",
                 "endpoint": "https://vllm-nimbus.carlboettiger.info/v1",
-                "api_key": "${NIMBUS_API_KEY}",
-                "use_responses_api": false
+                "api_key": "${NIMBUS_API_KEY}"
             },
             {
                 "value": "qwen3",
