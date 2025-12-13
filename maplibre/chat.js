@@ -26,10 +26,87 @@ class WetlandsChatbot {
         this.maxReconnectAttempts = 3; // Maximum reconnection attempts
         this.healthCheckInterval = null; // For periodic health checks
 
+        // Define local tools for map control (executed in browser, not via MCP)
+        this.localTools = this.defineLocalTools();
+
         this.initializeUI();
         this.loadSystemPrompt();
         this.initMCP();
         this.startHealthCheck(); // Start monitoring connection health
+    }
+
+    // Define local tools for controlling the map
+    defineLocalTools() {
+        return [
+            {
+                name: 'toggle_map_layer',
+                description: 'Toggle visibility of map overlay layers. Use this to show or hide data layers on the map such as wetlands, carbon, protected areas, etc. Available layers: "wetlands" (Global Wetlands/GLWD), "carbon" (Vulnerable Carbon), "ncp" (Nature\'s Contributions to People), "ramsar" (Ramsar Wetland Sites), "wdpa" (Protected Areas/WDPA), "hydrobasins" (Watersheds/HydroBASINS).',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        layer: {
+                            type: 'string',
+                            description: 'The layer to control. One of: "wetlands", "carbon", "ncp", "ramsar", "wdpa", "hydrobasins"',
+                            enum: ['wetlands', 'carbon', 'ncp', 'ramsar', 'wdpa', 'hydrobasins']
+                        },
+                        action: {
+                            type: 'string',
+                            description: 'The action to perform: "show" to make visible, "hide" to make invisible, "toggle" to switch current state',
+                            enum: ['show', 'hide', 'toggle']
+                        }
+                    },
+                    required: ['layer', 'action']
+                },
+                execute: (args) => {
+                    if (!window.MapController) {
+                        return JSON.stringify({ success: false, error: 'Map controller not available' });
+                    }
+
+                    let result;
+                    if (args.action === 'toggle') {
+                        result = window.MapController.toggleLayer(args.layer);
+                    } else {
+                        const visible = args.action === 'show';
+                        result = window.MapController.setLayerVisibility(args.layer, visible);
+                    }
+
+                    return JSON.stringify(result);
+                }
+            },
+            {
+                name: 'get_map_layers',
+                description: 'Get a list of all available map layers and their current visibility status. Use this to check what layers exist and which are currently shown.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                    required: []
+                },
+                execute: () => {
+                    if (!window.MapController) {
+                        return JSON.stringify({ success: false, error: 'Map controller not available' });
+                    }
+                    const layers = window.MapController.getAvailableLayers();
+                    return JSON.stringify({ success: true, layers: layers });
+                }
+            }
+        ];
+    }
+
+    // Check if a tool is a local tool (executed in browser)
+    isLocalTool(toolName) {
+        return this.localTools.some(tool => tool.name === toolName);
+    }
+
+    // Execute a local tool
+    executeLocalTool(toolName, args) {
+        const tool = this.localTools.find(t => t.name === toolName);
+        if (!tool) {
+            return JSON.stringify({ success: false, error: `Unknown local tool: ${toolName}` });
+        }
+        console.log(`[Local Tool] Executing ${toolName} with args:`, args);
+        const result = tool.execute(args);
+        console.log(`[Local Tool] Result:`, result);
+        return result;
     }
 
     getCurrentModelConfig() {
@@ -212,10 +289,11 @@ class WetlandsChatbot {
         // Welcome message
         this.addMessage(
             'assistant',
-            'Hi! I can help you explore global wetlands data (GLWDv2.0). Try asking:\n\n' +
+            'Hi! I can help you explore global wetlands data (GLWDv2.0) and control the map. Try asking:\n\n' +
             '* "How many hectares of peatlands are there?"\n' +
             '* "Calculate vulnerable carbon stored in different wetlands of India?"\n' +
-            '* "How many bird species can be found in forested wetlands in Costa Rica? List the species as csv."'
+            '* "Show me Ramsar sites on the map"\n' +
+            '* "Hide the wetlands layer and show protected areas"'
         );
     }
 
@@ -300,24 +378,43 @@ class WetlandsChatbot {
                 content += `<div class="tool-reasoning" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1);">${marked.parse(reasoning)}</div>`;
             }
 
+            // Check if all tool calls are local (map control) tools
+            const allLocalTools = toolCalls.every(tc => this.isLocalTool(tc.function.name));
+
             toolCalls.forEach((toolCall, index) => {
                 const functionArgs = JSON.parse(toolCall.function.arguments);
-                const sqlQuery = functionArgs.query || 'No query provided';
+                const isLocal = this.isLocalTool(toolCall.function.name);
 
-                content += `
-                    <div class="tool-call-item">
-                        <details>
-                            <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">${toolCall.function.name}</summary>
-                            <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
-                        </details>
-                    </div>
-                `;
+                if (isLocal) {
+                    // Format local tool call (map control)
+                    const argsDisplay = JSON.stringify(functionArgs, null, 2);
+                    content += `
+                        <div class="tool-call-item">
+                            <details>
+                                <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">🗺️ ${toolCall.function.name}</summary>
+                                <pre style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px; overflow-x: auto;"><code class="language-json">${this.escapeHtml(argsDisplay)}</code></pre>
+                            </details>
+                        </div>
+                    `;
+                } else {
+                    // Format MCP tool call (SQL query)
+                    const sqlQuery = functionArgs.query || 'No query provided';
+                    content += `
+                        <div class="tool-call-item">
+                            <details>
+                                <summary class="query-summary-btn" style="cursor: pointer; user-select: none;">${toolCall.function.name}</summary>
+                                <pre style="margin-top: 8px; padding: 0; border-radius: 4px; overflow-x: auto;"><code class="language-sql">${this.escapeHtml(sqlQuery)}</code></pre>
+                            </details>
+                        </div>
+                    `;
+                }
             });
 
-            // Add approval button
+            // Add approval button with context-appropriate label
+            const buttonLabel = allLocalTools ? '✓ Update Map' : '✓ Run Query';
             content += `
                 <div class="tool-approval-buttons" style="margin-top: 12px;">
-                    <button class="approve-btn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">✓ Run Query</button>
+                    <button class="approve-btn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">${buttonLabel}</button>
                 </div>
             `;
 
@@ -615,17 +712,16 @@ class WetlandsChatbot {
 
         // Convert MCP tools to OpenAI function format
         console.log('[LLM] Raw MCP tools available:', this.mcpTools?.length || 0);
+        console.log('[LLM] Local tools available:', this.localTools?.length || 0);
 
-        // Check if tools are available
+        // Check if MCP tools are available (local tools are always available)
         if (!this.mcpTools || this.mcpTools.length === 0) {
-            console.error('[LLM] ❌ No MCP tools available - cannot execute queries');
-            return {
-                response: 'The database connection is not available. MCP tools failed to load. Please refresh the page and try again.',
-                sqlQueries: []
-            };
+            console.warn('[LLM] ⚠️ No MCP tools available - database queries will not work');
+            // Continue anyway since we have local tools for map control
         }
 
-        const tools = this.mcpTools.map(tool => ({
+        // Convert MCP tools to OpenAI function format
+        const mcpToolsFormatted = (this.mcpTools || []).map(tool => ({
             type: 'function',
             function: {
                 name: tool.name,
@@ -642,6 +738,19 @@ class WetlandsChatbot {
                 }
             }
         }));
+
+        // Convert local tools to OpenAI function format
+        const localToolsFormatted = this.localTools.map(tool => ({
+            type: 'function',
+            function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.inputSchema
+            }
+        }));
+
+        // Combine all tools
+        const tools = [...mcpToolsFormatted, ...localToolsFormatted];
 
         console.log('[LLM] Converted tools:', JSON.stringify(tools, null, 2));
 
@@ -792,44 +901,70 @@ class WetlandsChatbot {
                         continue;
                     }
 
-                    // Capture the SQL query
-                    if (functionArgs.query) {
-                        this.currentTurnQueries.push(functionArgs.query);
-                        console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
-                    }
+                    // Check if this is a local tool (map control) or MCP tool (database query)
+                    const toolName = toolCall.function.name;
 
-                    // Check if the query argument is missing or empty
-                    if (!functionArgs.query || functionArgs.query.trim() === '') {
-                        console.warn('[LLM] ⚠️  WARNING: Tool call missing or empty "query" argument!');
-                        const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
+                    if (this.isLocalTool(toolName)) {
+                        // Execute local tool (no MCP needed)
+                        console.log(`[Local Tool] Executing ${toolName}...`);
+                        let toolResult;
+                        try {
+                            toolResult = this.executeLocalTool(toolName, functionArgs);
+                            console.log(`[Local Tool] ✅ ${toolName} completed`);
+                            toolResults.push(toolResult);
+                        } catch (err) {
+                            console.error('[Local Tool] Execution error:', err);
+                            toolResult = JSON.stringify({ success: false, error: err.message });
+                            toolResults.push(toolResult);
+                        }
+
+                        // Add tool result to messages
                         currentTurnMessages.push({
                             role: 'tool',
                             tool_call_id: toolCall.id,
-                            content: errorMsg
+                            content: toolResult
                         });
-                        toolResults.push(errorMsg);
-                        continue;
-                    }
+                    } else {
+                        // This is an MCP tool (database query)
+                        // Capture the SQL query
+                        if (functionArgs.query) {
+                            this.currentTurnQueries.push(functionArgs.query);
+                            console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
+                        }
 
-                    // Execute the query via MCP
-                    console.log('[MCP] Executing query via MCP...');
-                    let queryResult;
-                    try {
-                        queryResult = await this.executeMCPQuery(functionArgs.query);
-                        console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
-                        toolResults.push(queryResult);
-                    } catch (err) {
-                        console.error('[MCP] Execution error:', err);
-                        queryResult = `Error executing query: ${err.message}`;
-                        toolResults.push(queryResult);
-                    }
+                        // Check if the query argument is missing or empty
+                        if (!functionArgs.query || functionArgs.query.trim() === '') {
+                            console.warn('[LLM] ⚠️  WARNING: Tool call missing or empty "query" argument!');
+                            const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
+                            currentTurnMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                content: errorMsg
+                            });
+                            toolResults.push(errorMsg);
+                            continue;
+                        }
 
-                    // Add tool result to messages
-                    currentTurnMessages.push({
-                        role: 'tool',
-                        tool_call_id: toolCall.id,
-                        content: queryResult
-                    });
+                        // Execute the query via MCP
+                        console.log('[MCP] Executing query via MCP...');
+                        let queryResult;
+                        try {
+                            queryResult = await this.executeMCPQuery(functionArgs.query);
+                            console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
+                            toolResults.push(queryResult);
+                        } catch (err) {
+                            console.error('[MCP] Execution error:', err);
+                            queryResult = `Error executing query: ${err.message}`;
+                            toolResults.push(queryResult);
+                        }
+
+                        // Add tool result to messages
+                        currentTurnMessages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: queryResult
+                        });
+                    }
                 }
 
                 // Remove the running button now that query is complete

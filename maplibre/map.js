@@ -2,6 +2,151 @@
 let protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
 
+// MapController: API for chatbot to control the map
+window.MapController = {
+    // Available layers with their display names and associated map layer IDs
+    layers: {
+        'wetlands': {
+            displayName: 'Global Wetlands (GLWD)',
+            layerIds: ['wetlands-layer'],
+            checkboxId: 'wetlands-layer',
+            hasLegend: true
+        },
+        'ncp': {
+            displayName: "Nature's Contributions to People",
+            layerIds: ['ncp-layer'],
+            checkboxId: 'ncp-layer',
+            hasLegend: false
+        },
+        'carbon': {
+            displayName: 'Vulnerable Carbon',
+            layerIds: ['carbon-layer'],
+            checkboxId: 'carbon-layer',
+            hasLegend: false
+        },
+        'ramsar': {
+            displayName: 'Ramsar Wetland Sites',
+            layerIds: ['ramsar-layer', 'ramsar-outline'],
+            checkboxId: 'ramsar-layer',
+            hasLegend: false
+        },
+        'wdpa': {
+            displayName: 'Protected Areas (WDPA)',
+            layerIds: ['wdpa-layer', 'wdpa-outline'],
+            checkboxId: 'wdpa-layer',
+            hasLegend: false
+        },
+        'hydrobasins': {
+            displayName: 'Watersheds (HydroBASINS L6)',
+            layerIds: ['hydrobasins-fill', 'hydrobasins-layer'],
+            checkboxId: 'hydrobasins-layer',
+            hasLegend: false
+        }
+    },
+
+    // Get list of available layers and their current visibility
+    getAvailableLayers: function () {
+        const result = {};
+        for (const [key, config] of Object.entries(this.layers)) {
+            const checkbox = document.getElementById(config.checkboxId);
+            result[key] = {
+                displayName: config.displayName,
+                visible: checkbox ? checkbox.checked : false
+            };
+        }
+        return result;
+    },
+
+    // Set layer visibility
+    setLayerVisibility: function (layerKey, visible) {
+        const config = this.layers[layerKey];
+        if (!config) {
+            return { success: false, error: `Unknown layer: ${layerKey}. Available layers: ${Object.keys(this.layers).join(', ')}` };
+        }
+
+        // Check if map and layers are ready
+        if (!window.map || !window.map.getLayer) {
+            return { success: false, error: 'Map not yet initialized' };
+        }
+
+        try {
+            const visibility = visible ? 'visible' : 'none';
+
+            // Set visibility on all associated layer IDs
+            for (const layerId of config.layerIds) {
+                if (window.map.getLayer(layerId)) {
+                    window.map.setLayoutProperty(layerId, 'visibility', visibility);
+                }
+            }
+
+            // Update the checkbox to match
+            const checkbox = document.getElementById(config.checkboxId);
+            if (checkbox) {
+                checkbox.checked = visible;
+            }
+
+            // Handle legend visibility for wetlands layer
+            if (config.hasLegend) {
+                const legend = document.getElementById('legend');
+                if (legend) {
+                    legend.style.display = visible ? 'block' : 'none';
+                }
+            }
+
+            console.log(`[MapController] Layer '${layerKey}' visibility set to ${visible}`);
+            return {
+                success: true,
+                layer: layerKey,
+                displayName: config.displayName,
+                visible: visible
+            };
+        } catch (error) {
+            console.error('[MapController] Error setting layer visibility:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Toggle layer visibility
+    toggleLayer: function (layerKey) {
+        const config = this.layers[layerKey];
+        if (!config) {
+            return { success: false, error: `Unknown layer: ${layerKey}` };
+        }
+
+        const checkbox = document.getElementById(config.checkboxId);
+        const currentlyVisible = checkbox ? checkbox.checked : false;
+        return this.setLayerVisibility(layerKey, !currentlyVisible);
+    },
+
+    // Show only specified layers (hide all others)
+    showOnlyLayers: function (layerKeys) {
+        const results = [];
+        for (const key of Object.keys(this.layers)) {
+            const shouldShow = layerKeys.includes(key);
+            results.push(this.setLayerVisibility(key, shouldShow));
+        }
+        return results;
+    },
+
+    // Hide all overlay layers
+    hideAllLayers: function () {
+        const results = [];
+        for (const key of Object.keys(this.layers)) {
+            results.push(this.setLayerVisibility(key, false));
+        }
+        return results;
+    },
+
+    // Show all overlay layers  
+    showAllLayers: function () {
+        const results = [];
+        for (const key of Object.keys(this.layers)) {
+            results.push(this.setLayerVisibility(key, true));
+        }
+        return results;
+    }
+};
+
 const map = new maplibregl.Map({
     container: 'map',
     // projection: 'globe',
@@ -9,6 +154,9 @@ const map = new maplibregl.Map({
     center: [0, 20],
     zoom: 1.5
 });
+
+// Expose map globally for MapController access
+window.map = map;
 
 // Add error handlers for debugging
 map.on('error', function (e) {
