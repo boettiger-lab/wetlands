@@ -190,7 +190,7 @@ Common patterns for fill-color:
 - Interpolated: ["interpolate", ["linear"], ["get", "property_name"], min, "#minColor", max, "#maxColor"]
 
 WDPA useful properties for coloring: OWN_TYPE (ownership), IUCN_CAT (IUCN category), GOV_TYPE (governance), DESIG_TYPE (designation type)
-Ramsar useful properties: iso3 (country), Criterion1-Criterion9 (boolean criteria)
+Ramsar useful properties: ramsarid (unique site ID), Site name (site name), iso3/Country (country), Region (geographic region), Wetland Type (wetland classification), Criterion1-Criterion9 (boolean criteria), Montreux listed (conservation status), Management plan implemented (management status)
 HydroBASINS useful properties: SUB_AREA (basin size), UP_AREA (upstream area)
 
 Example: Color WDPA by ownership type:

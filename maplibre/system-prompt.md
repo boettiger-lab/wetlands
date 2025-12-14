@@ -43,7 +43,7 @@ Paint expressions for data-driven coloring:
 
 **Useful properties for coloring:**
 - WDPA: `OWN_TYPE` (ownership), `IUCN_CAT` (IUCN category), `GOV_TYPE` (governance), `DESIG_TYPE`
-- Ramsar: `iso3` (country), `Criterion1`-`Criterion9` (boolean)
+- Ramsar: `ramsarid` (unique site ID), `Site name` (site name), `iso3`/`Country` (country), `Region` (geographic region), `Wetland Type` (wetland classification), `Criterion1`-`Criterion9` (boolean criteria), `Montreux listed` (conservation status), `Management plan implemented` (management status)
 - HydroBASINS: `SUB_AREA` (basin size), `UP_AREA` (upstream area)
 
 ### MapLibre Filter Syntax
@@ -68,11 +68,31 @@ Filters use MapLibre expression syntax (arrays):
 - `NAME_ENG` - Site name
 
 **Ramsar Sites:**
-- `officialna` - Official site name
+- `ramsarid` - Unique Ramsar site ID (number)
+- `Site name` / `officialna` - Official site name (string)
+- `Region` - Geographic region (string)
+- `Country` / `country_en` - Country name (string)
+- `Territory` - Territory name (string)
 - `iso3` - Country code (3-letter)
-- `country_en` - Country name
-- `area_off` - Area in hectares (number)
+- `Designation date` - Date of Ramsar designation (string)
+- `Last publication date` - Last update date (string)
+- `Area (ha)` / `area_off` - Area in hectares (number)
+- `Latitude` / `Longitude` - Coordinates (number)
+- `Annotated summary` - Site description (string)
 - `Criterion1` through `Criterion9` - Boolean flags for Ramsar criteria
+- `Wetland Type` - Type of wetland ecosystem (string)
+- `Maximum elevation` / `Minimum elevation` - Elevation range in meters (number)
+- `Montreux listed` - Whether site is on Montreux Record (boolean)
+- `Management plan implemented` - Management plan status (boolean)
+- `Management plan available` - Management plan availability (boolean)
+- `Ecosystem services` - Description of ecosystem services (string)
+- `Threats` - Documented threats to site (string)
+- `large administrative region` - Large administrative region (string)
+- `Global international legal designations` - Global legal designations (string)
+- `Regional international legal designations` - Regional legal designations (string)
+- `National conservation designation` - National conservation status (string)
+- `Does the wetland extend onto the territory of one or more other countries?` - Transboundary status (boolean)
+- `Ramsar Advisory Mission?` - Whether advisory mission conducted (boolean)
 
 **HydroBASINS:**
 - `PFAF_ID` - Pfafstetter code (number)
@@ -187,14 +207,9 @@ You have access to these primary datasets via SQL queries:
    - **Not Reported/Not Applicable/Not Assigned**: Protected area exists but IUCN category not assigned
 
 7. **Ramsar Sites - Wetlands of International Importance** (`s3://public-wetlands/ramsar/hex/**`)
-   - Columns: ramsarid (Ramsar site ID), officialna (official site name), iso3 (ISO 3-letter country code), country_en (country name in English), area_off (official area in hectares), h8 (H3 hex ID), h0 (coarse hex ID).  For additional information, use the site-details.parquet (join my ramsarid) mentioned below.
-   - Global coverage of Ramsar Convention sites indexed by H3 hexagons at resolution 8
-   - Key columns: officialna (site name), country_en (country), area_off (designated area in hectares), ramsarid (unique Ramsar identifier)
-   - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
-   - Additional site details available at `s3://public-wetlands/ramsar/site-details.parquet` - join on `ramsarid` column
-   - Site details columns: `ramsarid` (join key), `Site name`, `Region`, `Country`, `Territory`, `Designation date`, `Last publication date`, `Area (ha)`, `Latitude`, `Longitude`, `Annotated summary`, `Criterion1`-`Criterion9` (boolean flags for each Ramsar criterion), `Wetland Type`, `Maximum elevation`, `Minimum elevation`, `Montreux listed`, `Management plan implemented`, `Management plan available`, `Ecosystem services`, `Threats`, `large administrative region`, `Global international legal designations`, `Regional international legal designations`, `National conservation designation`, `Does the wetland extend onto the territory of one or more other countries?`, `Ramsar Advisory Mission?`
+in hectares), .  For additional information, use the site-details.parquet (join my ramsarid) mentioned below.
+   - Columns: `h8` (H3 hex ID), `h0` (coarse hex ID, hive partitioned),  `ramsarid`, `Site name`, `Region`, `Country`, `Territory`, `Designation date`, `Last publication date`, `Area (ha)`, `Latitude`, `Longitude`, `Annotated summary`, `Criterion1`-`Criterion9` (boolean flags for each Ramsar criterion), `Wetland Type`, `Maximum elevation`, `Minimum elevation`, `Montreux listed`, `Management plan implemented`, `Management plan available`, `Ecosystem services`, `Threats`, `large administrative region`, `Global international legal designations`, `Regional international legal designations`, `National conservation designation`, `Does the wetland extend onto the territory of one or more other countries?`, `Ramsar Advisory Mission?`
    - Derived from the Ramsar Sites Information Service, <https://rsis.ramsar.org/>
-   - All the columns from "site details" are also available in the PMTiles layer for ramsar data, and can be used to filter the map.  
 
 
    **Ramsar Criteria for Identifying Wetlands of International Importance:**
