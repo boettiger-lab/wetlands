@@ -195,7 +195,11 @@ HydroBASINS useful properties: SUB_AREA (basin size), UP_AREA (upstream area)
 
 Example: Color WDPA by ownership type:
   property: "fill-color"
-  value: ["match", ["get", "OWN_TYPE"], "State", "#1f77b4", "Private", "#ff7f0e", "Community", "#2ca02c", "Joint", "#d62728", "#999999"]`,
+  value: ["match", ["get", "OWN_TYPE"], "State", "#1f77b4", "Private", "#ff7f0e", "Community", "#2ca02c", "Joint", "#d62728", "#999999"]
+
+IMPORTANT: When explaining colors to users, display them as visual legend boxes using HTML:
+<span style="background-color: #colorhex; padding: 4px 12px; border-radius: 3px; color: white; font-weight: bold;">color name</span>
+Example: "State-owned areas are <span style="background-color: #1f77b4; padding: 4px 12px; border-radius: 3px; color: white; font-weight: bold;">blue</span>, Private areas are <span style="background-color: #ff7f0e; padding: 4px 12px; border-radius: 3px; color: white; font-weight: bold;">orange</span>"`,
                 inputSchema: {
                     type: 'object',
                     properties: {
@@ -448,7 +452,7 @@ Example: Color WDPA by ownership type:
             'Hi! I can help you explore global wetlands data and control the map. Try asking:\n\n' +
             '* "How many hectares of peatlands are there?"\n' +
             '* "Calculate vulnerable carbon stored in different wetlands of India?"\n' +
-            '* "Show IUCN category II protected areas colored by ownership type"\n' +
+            '* "Show state-owned protected areas colored by IUCN category"\n' +
             '* "Filter Ramsar sites to those meeting Criterion 1 and 2"'
         );
     }
