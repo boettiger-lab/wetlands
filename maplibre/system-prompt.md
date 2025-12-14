@@ -43,7 +43,7 @@ Paint expressions for data-driven coloring:
 
 **Useful properties for coloring:**
 - WDPA: `OWN_TYPE` (ownership), `IUCN_CAT` (IUCN category), `GOV_TYPE` (governance), `DESIG_TYPE`
-- Ramsar: `iso3` (country), `Criterion1`-`Criterion9` (boolean)
+- Ramsar: `ramsarid` (unique site ID), `Site name` (site name), `iso3`/`Country` (country), `Region` (geographic region), `Wetland Type` (wetland classification), `Criterion1`-`Criterion9` (boolean criteria), `Montreux listed` (conservation status), `Management plan implemented` (management status)
 - HydroBASINS: `SUB_AREA` (basin size), `UP_AREA` (upstream area)
 
 ### MapLibre Filter Syntax
@@ -68,11 +68,31 @@ Filters use MapLibre expression syntax (arrays):
 - `NAME_ENG` - Site name
 
 **Ramsar Sites:**
-- `officialna` - Official site name
+- `ramsarid` - Unique Ramsar site ID (number)
+- `Site name` / `officialna` - Official site name (string)
+- `Region` - Geographic region (string)
+- `Country` / `country_en` - Country name (string)
+- `Territory` - Territory name (string)
 - `iso3` - Country code (3-letter)
-- `country_en` - Country name
-- `area_off` - Area in hectares (number)
+- `Designation date` - Date of Ramsar designation (string)
+- `Last publication date` - Last update date (string)
+- `Area (ha)` / `area_off` - Area in hectares (number)
+- `Latitude` / `Longitude` - Coordinates (number)
+- `Annotated summary` - Site description (string)
 - `Criterion1` through `Criterion9` - Boolean flags for Ramsar criteria
+- `Wetland Type` - Type of wetland ecosystem (string)
+- `Maximum elevation` / `Minimum elevation` - Elevation range in meters (number)
+- `Montreux listed` - Whether site is on Montreux Record (boolean)
+- `Management plan implemented` - Management plan status (boolean)
+- `Management plan available` - Management plan availability (boolean)
+- `Ecosystem services` - Description of ecosystem services (string)
+- `Threats` - Documented threats to site (string)
+- `large administrative region` - Large administrative region (string)
+- `Global international legal designations` - Global legal designations (string)
+- `Regional international legal designations` - Regional legal designations (string)
+- `National conservation designation` - National conservation status (string)
+- `Does the wetland extend onto the territory of one or more other countries?` - Transboundary status (boolean)
+- `Ramsar Advisory Mission?` - Whether advisory mission conducted (boolean)
 
 **HydroBASINS:**
 - `PFAF_ID` - Pfafstetter code (number)
