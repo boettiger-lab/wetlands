@@ -69,7 +69,7 @@ COPY (
   FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') c
   JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
       ON c.h8 = w.h8 AND c.h0 = w.h0
-  JOIN read_parquet('s3://public-inat/hexagon/**') pos 
+  JOIN read_parquet('s3://public-inat/range-maps/hex/**') pos 
       ON h3_cell_to_parent(w.h8, 4) = pos.h4 AND w.h0 = pos.h0
   JOIN read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet') t
       ON pos.taxon_id = t.id

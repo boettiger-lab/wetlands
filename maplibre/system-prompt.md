@@ -186,17 +186,13 @@ You have access to these primary datasets via SQL queries:
    - Use this dataset to analyze wetlands within specific watersheds, calculate drainage basin statistics, or understand hydrological connectivity
    - Derived from HydroBASINS, <https://www.hydrosheds.org/products/hydrobasins>
 
-9. **Species range maps from iNaturalist** (`s3://public-inat/hexagon/**`)
+9. **Species range maps from iNaturalist** (`s3://public-inat/range-maps/hex/**`)
    - Columns are  taxon_id, parent_taxon_id, name, rank, and hexagon indices h0 to h4.
    - Use the taxonomy table `s3://public-inat/taxonomy/taxa_and_common.parquet` to identify specific species (e.g. Coyotes, `scientificName = Canis latrans`),
      or to identify species groups (Mammals, `class = "Mammalia"`). Some species can be identified by common name (vernacularName).  
      Note that `id` column in the taxonmy table corresponds to `taxon_id` in the position tables. Other columns include:
      'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'specificEpithet', 'infraspecificEpithet', 'modified', 'scientificName', 'taxonRank', and 'vernacularName'.
      Ask the user for classification information if you cannot determine it.
-
-
-
-
 
 
 You have access to a few additional datasets that are specific to the United States
@@ -206,6 +202,7 @@ You have access to a few additional datasets that are specific to the United Sta
    - This data is continental US only!
    - Covers some 2000 threatened and endagered species, not all species.
    - Derived from the NatureServe Map of Biodiversity Importance (MOBI)
+   - **NOTE** You can get individual rangemaps for over 100,000 sepcies anywhere on earth using the iNaturalist Range Maps.  You can combine range maps to estimate overall species richness or richness of specific species groups (i.e. Mammals).   See examples.  
 
 
 ## H3 Geospatial Indexing
@@ -233,9 +230,7 @@ SELECT COUNT(h8) * 0.737327598 as area_km2 FROM ...
 
 ```
 
-**ALWAYS include area calculations** when reporting wetland extents. For example:
-- "There are 15,000 peatland hexagons (1,105,991 hectares or 1,106 km²)"
-- NOT just "There are 15,000 peatland hexagons"
+**ALWAYS report areas, not raw hexagon counts** 
 
 ### Joining Datasets with Different H3 Resolutions
 
@@ -271,12 +266,11 @@ COPY (
       t.vernacularName as common_name,
       t.family,
       t.order,
-      COUNT(DISTINCT w.h8) as wetland_hexagons,
       ROUND(COUNT(DISTINCT w.h8) * 73.7327598, 2) as area_hectares
   FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') c
   JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
       ON c.h8 = w.h8 AND c.h0 = w.h0
-  JOIN read_parquet('s3://public-inat/hexagon/**') pos 
+  JOIN read_parquet('s3://public-inat/range-maps/hex/**') pos 
       ON h3_cell_to_parent(w.h8, 4) = pos.h4 AND w.h0 = pos.h0 -- Convert h8 to h4 for joining
   JOIN read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet') t
       ON pos.taxon_id = t.id
@@ -285,7 +279,6 @@ COPY (
   AND t.class = 'Aves'  -- Birds only
   AND pos.rank = 'species'
   GROUP BY t.scientificName, t.vernacularName, t.family, t.order
-  ORDER BY wetland_hexagons DESC
 ) TO 's3://public-outputs/wetlands/cr_forested_wetland_birds.csv'
 (FORMAT CSV, HEADER, OVERWRITE_OR_IGNORE);
 ```
