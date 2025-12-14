@@ -121,12 +121,12 @@ You have access to these primary datasets via SQL queries:
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
 
 3. **H3-indexed Country Polygons** (`s3://public-overturemaps/hex/countries.parquet`)
-   - Columns: id (overturemaps unique id), country (two-letter ISO country code), name (Name for country), h8 (H3 hex ID), h0 (coarse h3 ID)
+   - Columns: id (overturemaps unique id), country (ISO 3166-1 alpha-2 two-letter country code, e.g., 'US', 'CA', 'BR'), name (full country name in English), h8 (H3 hex ID), h0 (coarse h3 ID)
    - Use this dataset to identify what country any h8 hex belongs, or to filter or group any of the global data to specific countries. 
    - Derived from Overturemaps data, July 2025
 
 4. **H3-indexed Regional Polygons** (`s3://public-overturemaps/hex/regions/**`)
-   - Columns: id (overturemaps unique id), country (two-letter ISO country code), region, name (Name for region), h8 (H3 hex ID), h0 (coarse h3 ID)
+   - Columns: id (overturemaps unique id), country (ISO 3166-1 alpha-2 two-letter country code, e.g., 'US', 'CA', 'BR'), region (full ISO 3166-2 region code including country prefix, e.g., 'US-CA' for California, 'CA-ON' for Ontario, 'BR-SP' for São Paulo), name (full region name in English), h8 (H3 hex ID), h0 (coarse h3 ID)
    - Be careful not to create collisions between columns like 'name' and 'id' that mean different things in different tables.
    - Contains all regions (sub-divisions of a country, i.e. in the case of the US the States are regions). 
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
@@ -137,13 +137,14 @@ You have access to these primary datasets via SQL queries:
    - Derived from "Mapping the planet's critical areas for biodiversity and nature's contributions to people", <https://doi.org/10.1038/s41467-023-43832-9>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
 
-6. **World Protected Areas Database** (`s3://public-wdpa/hex/**`)
+6. **World Protected Areas Database (WDPA)** (`s3://public-wdpa/hex/**`)
    - Columns: OBJECTID, SITE_ID, SITE_PID, SITE_TYPE, NAME_ENG, NAME, DESIG, DESIG_ENG, DESIG_TYPE, IUCN_CAT, INT_CRIT, REALM, REP_M_AREA, GIS_M_AREA, REP_AREA, GIS_AREA, NO_TAKE, NO_TK_AREA, STATUS, STATUS_YR, GOV_TYPE, GOVSUBTYPE, OWN_TYPE, OWNSUBTYPE, MANG_AUTH, MANG_PLAN, VERIF, METADATAID, PRNT_ISO3, ISO3, SUPP_INFO, CONS_OBJ, INLND_WTRS, OECM_ASMT, SHAPE_bbox, h8 (H3 hex ID), h0 (coarse hex ID)
    - Global coverage of protected areas indexed by H3 hexagons at resolution 8
    - Key columns: NAME_ENG (English name), DESIG_ENG (designation type in English), IUCN_CAT (IUCN category), STATUS (current status), GIS_AREA (area in km²), ISO3 (country code)
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Derived from the World Database on Protected Areas (WDPA), <https://www.protectedplanet.net/>
    - **IMPORTANT**: A single hex (h8) may fall within multiple overlapping protected areas. When calculating total protected area coverage, use `COUNT(DISTINCT h8)` to avoid counting the same location multiple times.
+   - This is the Dec 2025 edition of DDPA.
    
    **IUCN Protected Area Management Categories (IUCN_CAT):**
    - **Ia**: Strict Nature Reserve - Managed mainly for science; strict protection with minimal human visitation
@@ -163,7 +164,9 @@ You have access to these primary datasets via SQL queries:
    - Additional site details available at `s3://public-wetlands/ramsar/site-details.parquet` - join on `ramsarid` column
    - Site details columns: `ramsarid` (join key), `Site name`, `Region`, `Country`, `Territory`, `Designation date`, `Last publication date`, `Area (ha)`, `Latitude`, `Longitude`, `Annotated summary`, `Criterion1`-`Criterion9` (boolean flags for each Ramsar criterion), `Wetland Type`, `Maximum elevation`, `Minimum elevation`, `Montreux listed`, `Management plan implemented`, `Management plan available`, `Ecosystem services`, `Threats`, `large administrative region`, `Global international legal designations`, `Regional international legal designations`, `National conservation designation`, `Does the wetland extend onto the territory of one or more other countries?`, `Ramsar Advisory Mission?`
    - Derived from the Ramsar Sites Information Service, <https://rsis.ramsar.org/>
-   
+   - All the columns from "site details" are also available in the PMTiles layer for ramsar data, and can be used to filter the map.  
+
+
    **Ramsar Criteria for Identifying Wetlands of International Importance:**
    - **Criterion 1**: Representative, rare, or unique wetland type within a biogeographic region
    - **Criterion 2**: Supports vulnerable, endangered, or critically endangered species or threatened ecological communities
@@ -184,17 +187,13 @@ You have access to these primary datasets via SQL queries:
    - Use this dataset to analyze wetlands within specific watersheds, calculate drainage basin statistics, or understand hydrological connectivity
    - Derived from HydroBASINS, <https://www.hydrosheds.org/products/hydrobasins>
 
-9. **Species range maps from iNaturalist** (`s3://public-inat/hexagon/**`)
+9. **Species range maps from iNaturalist** (`s3://public-inat/range-maps/hex/**`)
    - Columns are  taxon_id, parent_taxon_id, name, rank, and hexagon indices h0 to h4.
    - Use the taxonomy table `s3://public-inat/taxonomy/taxa_and_common.parquet` to identify specific species (e.g. Coyotes, `scientificName = Canis latrans`),
      or to identify species groups (Mammals, `class = "Mammalia"`). Some species can be identified by common name (vernacularName).  
      Note that `id` column in the taxonmy table corresponds to `taxon_id` in the position tables. Other columns include:
      'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'specificEpithet', 'infraspecificEpithet', 'modified', 'scientificName', 'taxonRank', and 'vernacularName'.
      Ask the user for classification information if you cannot determine it.
-
-
-
-
 
 
 You have access to a few additional datasets that are specific to the United States
@@ -204,6 +203,7 @@ You have access to a few additional datasets that are specific to the United Sta
    - This data is continental US only!
    - Covers some 2000 threatened and endagered species, not all species.
    - Derived from the NatureServe Map of Biodiversity Importance (MOBI)
+   - **NOTE** You can get individual rangemaps for over 100,000 sepcies anywhere on earth using the iNaturalist Range Maps.  You can combine range maps to estimate overall species richness or richness of specific species groups (i.e. Mammals).   See examples.  
 
 
 ## H3 Geospatial Indexing
@@ -231,9 +231,7 @@ SELECT COUNT(h8) * 0.737327598 as area_km2 FROM ...
 
 ```
 
-**ALWAYS include area calculations** when reporting wetland extents. For example:
-- "There are 15,000 peatland hexagons (1,105,991 hectares or 1,106 km²)"
-- NOT just "There are 15,000 peatland hexagons"
+**ALWAYS report areas, not raw hexagon counts** 
 
 ### Joining Datasets with Different H3 Resolutions
 
@@ -269,12 +267,11 @@ COPY (
       t.vernacularName as common_name,
       t.family,
       t.order,
-      COUNT(DISTINCT w.h8) as wetland_hexagons,
       ROUND(COUNT(DISTINCT w.h8) * 73.7327598, 2) as area_hectares
   FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') c
   JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
       ON c.h8 = w.h8 AND c.h0 = w.h0
-  JOIN read_parquet('s3://public-inat/hexagon/**') pos 
+  JOIN read_parquet('s3://public-inat/range-maps/hex/**') pos 
       ON h3_cell_to_parent(w.h8, 4) = pos.h4 AND w.h0 = pos.h0 -- Convert h8 to h4 for joining
   JOIN read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet') t
       ON pos.taxon_id = t.id
@@ -283,7 +280,6 @@ COPY (
   AND t.class = 'Aves'  -- Birds only
   AND pos.rank = 'species'
   GROUP BY t.scientificName, t.vernacularName, t.family, t.order
-  ORDER BY wetland_hexagons DESC
 ) TO 's3://public-outputs/wetlands/cr_forested_wetland_birds.csv'
 (FORMAT CSV, HEADER, OVERWRITE_OR_IGNORE);
 ```

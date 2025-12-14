@@ -560,9 +560,9 @@ map.on('load', function () {
             new maplibregl.Popup()
                 .setLngLat(coordinates)
                 .setHTML(`
-                    <strong>${properties.officialna || 'Ramsar Site'}</strong><br>
-                    ${properties.country_en ? 'Country: ' + properties.country_en + '<br>' : ''}
-                    ${properties.area_off ? 'Area: ' + properties.area_off + ' ha<br>' : ''}
+                    <strong>${properties["Site name"] || 'Ramsar Site'}</strong><br>
+                    ${properties.ramsarid ? 'ID: ' + properties.ramsarid + '<br>' : ''}
+                    ${properties["Area (ha)"] ? 'Area: ' + properties["Area (ha)"] + ' ha<br>' : ''}
                 `)
                 .addTo(map);
         });
@@ -627,6 +627,7 @@ map.on('load', function () {
                     <strong>${properties.NAME_ENG || properties.NAME || 'Protected Area'}</strong><br>
                     ${properties.DESIG_ENG ? 'Type: ' + properties.DESIG_ENG + '<br>' : ''}
                     ${properties.IUCN_CAT ? 'IUCN Category: ' + properties.IUCN_CAT + '<br>' : ''}
+                    ${properties.OWN_TYPE ? 'Ownership: ' + properties.OWN_TYPE + '<br>' : ''}
                     ${properties.GIS_AREA ? 'Area: ' + properties.GIS_AREA + ' km²<br>' : ''}
                     ${properties.STATUS_YR ? 'Year: ' + properties.STATUS_YR + '<br>' : ''}
                 `)
