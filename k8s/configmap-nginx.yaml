@@ -53,15 +53,13 @@ data:
         add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
         add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Accept";
         
-        # Serve static files
+        # Serve static files - NO caching for dev environment
         location / {
             try_files $uri $uri/ /index.html;
-        }
-
-        # Cache static assets
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|json)$ {
-            expires 7d;
-            add_header Cache-Control "public, immutable";
+            # Disable all caching for development
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+            add_header Pragma "no-cache";
+            add_header Expires "0";
         }
 
         # Health check endpoint

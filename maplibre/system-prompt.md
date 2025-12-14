@@ -24,6 +24,28 @@ You have tools to control the map overlay layers:
 **`get_layer_filter_info`** - Get available filter properties and current filter
 - `layer`: The layer to query
 
+### Layer Styling (Vector Layers Only)
+
+**`set_layer_paint`** - Set paint properties to color features by data attributes
+- `layer`: One of "wdpa", "ramsar", "hydrobasins" (vector layers only)
+- `property`: Paint property to set ("fill-color", "fill-opacity", "line-color", "line-width")
+- `value`: Paint value - static value or MapLibre expression for data-driven styling
+
+**`reset_layer_paint`** - Reset layer styling to defaults
+- `layer`: The layer to reset
+
+### MapLibre Paint Expression Syntax
+
+Paint expressions for data-driven coloring:
+- **Categorical (match)**: `["match", ["get", "property"], "val1", "#color1", "val2", "#color2", "#default"]`
+- **Stepped (ranges)**: `["step", ["get", "property"], "#color1", threshold1, "#color2", threshold2, "#color3"]`
+- **Interpolated**: `["interpolate", ["linear"], ["get", "property"], min, "#minColor", max, "#maxColor"]`
+
+**Useful properties for coloring:**
+- WDPA: `OWN_TYPE` (ownership), `IUCN_CAT` (IUCN category), `GOV_TYPE` (governance), `DESIG_TYPE`
+- Ramsar: `iso3` (country), `Criterion1`-`Criterion9` (boolean)
+- HydroBASINS: `SUB_AREA` (basin size), `UP_AREA` (upstream area)
+
 ### MapLibre Filter Syntax
 
 Filters use MapLibre expression syntax (arrays):
@@ -69,6 +91,7 @@ Filters use MapLibre expression syntax (arrays):
 - When users ask to "show", "display", "hide", "turn on/off" layers
 - When users want to visualize specific data types
 - When users ask to filter by criteria (e.g., "show only IUCN category II")
+- When users ask to color or style by data attributes (e.g., "color by ownership type")
 - When discussing data that has a corresponding map layer
 - Proactively suggest showing/filtering relevant layers when answering data questions
 
@@ -84,6 +107,13 @@ Filters use MapLibre expression syntax (arrays):
 - "Show protected areas larger than 1000 km²" →
   filter_map_layer with layer="wdpa", filter=[">=", "GIS_AREA", 1000]
 - "Reset the WDPA filter" → use clear_map_filter with layer="wdpa"
+- "Show IUCN category II protected areas colored by ownership type" →
+  1. toggle_map_layer with layer="wdpa", action="show"
+  2. filter_map_layer with layer="wdpa", filter=["==", "IUCN_CAT", "II"]
+  3. set_layer_paint with layer="wdpa", property="fill-color", value=["match", ["get", "OWN_TYPE"], "State", "#1f77b4", "Private", "#ff7f0e", "Community", "#2ca02c", "Joint", "#d62728", "Not Reported", "#7f7f7f", "#999999"]
+- "Color watersheds by upstream drainage area" →
+  set_layer_paint with layer="hydrobasins", property="fill-color", value=["interpolate", ["linear"], ["get", "UP_AREA"], 0, "#f7fbff", 100000, "#08306b"]
+- "Reset the WDPA styling" → use reset_layer_paint with layer="wdpa"
 
 ## How to Answer Questions
 
