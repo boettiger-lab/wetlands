@@ -177,6 +177,73 @@ HydroBASINS properties: PFAF_ID, UP_AREA, SUB_AREA, MAIN_BAS`,
                         currentFilterDescription: filterResult.description
                     });
                 }
+            },
+            {
+                name: 'set_layer_paint',
+                description: `Set paint properties on a vector map layer to color features based on data attributes. Only works on vector layers: "wdpa" (Protected Areas), "ramsar" (Ramsar Sites), "hydrobasins" (Watersheds).
+
+Use this to create data-driven styling, such as coloring polygons by category. The paint property must be a valid MapLibre paint expression.
+
+Common patterns for fill-color:
+- Categorical (match): ["match", ["get", "property_name"], "value1", "#color1", "value2", "#color2", "#defaultColor"]
+- Stepped (ranges): ["step", ["get", "property_name"], "#color1", threshold1, "#color2", threshold2, "#color3"]
+- Interpolated: ["interpolate", ["linear"], ["get", "property_name"], min, "#minColor", max, "#maxColor"]
+
+WDPA useful properties for coloring: OWN_TYPE (ownership), IUCN_CAT (IUCN category), GOV_TYPE (governance), DESIG_TYPE (designation type)
+Ramsar useful properties: iso3 (country), Criterion1-Criterion9 (boolean criteria)
+HydroBASINS useful properties: SUB_AREA (basin size), UP_AREA (upstream area)
+
+Example: Color WDPA by ownership type:
+  property: "fill-color"
+  value: ["match", ["get", "OWN_TYPE"], "State", "#1f77b4", "Private", "#ff7f0e", "Community", "#2ca02c", "Joint", "#d62728", "#999999"]`,
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        layer: {
+                            type: 'string',
+                            description: 'The vector layer to style. One of: "wdpa", "ramsar", "hydrobasins"',
+                            enum: ['wdpa', 'ramsar', 'hydrobasins']
+                        },
+                        property: {
+                            type: 'string',
+                            description: 'The paint property to set. Common values: "fill-color", "fill-opacity", "line-color", "line-width"',
+                            enum: ['fill-color', 'fill-opacity', 'line-color', 'line-width']
+                        },
+                        value: {
+                            description: 'The paint value - either a static value (string/number) or a MapLibre expression array for data-driven styling'
+                        }
+                    },
+                    required: ['layer', 'property', 'value']
+                },
+                execute: (args) => {
+                    if (!window.MapController) {
+                        return JSON.stringify({ success: false, error: 'Map controller not available' });
+                    }
+                    const result = window.MapController.setLayerPaint(args.layer, args.property, args.value);
+                    return JSON.stringify(result);
+                }
+            },
+            {
+                name: 'reset_layer_paint',
+                description: 'Reset the paint styling of a vector layer back to its default appearance. Use this to undo any custom coloring applied with set_layer_paint.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        layer: {
+                            type: 'string',
+                            description: 'The vector layer to reset. One of: "wdpa", "ramsar", "hydrobasins"',
+                            enum: ['wdpa', 'ramsar', 'hydrobasins']
+                        }
+                    },
+                    required: ['layer']
+                },
+                execute: (args) => {
+                    if (!window.MapController) {
+                        return JSON.stringify({ success: false, error: 'Map controller not available' });
+                    }
+                    const result = window.MapController.resetLayerPaint(args.layer);
+                    return JSON.stringify(result);
+                }
             }
         ];
     }
@@ -378,11 +445,10 @@ HydroBASINS properties: PFAF_ID, UP_AREA, SUB_AREA, MAIN_BAS`,
         // Welcome message
         this.addMessage(
             'assistant',
-            'Hi! I can help you explore global wetlands data (GLWDv2.0) and control the map. Try asking:\n\n' +
+            'Hi! I can help you explore global wetlands data and control the map. Try asking:\n\n' +
             '* "How many hectares of peatlands are there?"\n' +
             '* "Calculate vulnerable carbon stored in different wetlands of India?"\n' +
-            '* "Show me Ramsar sites on the map"\n' +
-            '* "Show only IUCN category II protected areas"\n' +
+            '* "Show IUCN category II protected areas colored by ownership type"\n' +
             '* "Filter Ramsar sites to those meeting Criterion 1 and 2"'
         );
     }

@@ -375,6 +375,145 @@ window.MapController = {
 
         // Fallback
         return JSON.stringify(filter);
+    },
+
+    // Default paint properties for each vector layer (for reset functionality)
+    defaultPaint: {
+        'wdpa': {
+            'fill-color': '#2E7D32',
+            'fill-opacity': 0.4,
+            'line-color': '#1B5E20',
+            'line-width': 1.5
+        },
+        'ramsar': {
+            'fill-color': '#0288D1',
+            'fill-opacity': 0.4,
+            'line-color': '#01579B',
+            'line-width': 1.5
+        },
+        'hydrobasins': {
+            'fill-color': 'transparent',
+            'fill-opacity': 0.2,
+            'line-color': '#1565C0',
+            'line-width': 1
+        }
+    },
+
+    // Set a paint property on a vector layer (for data-driven styling)
+    setLayerPaint: function (layerKey, property, value) {
+        const config = this.layers[layerKey];
+        if (!config) {
+            return { success: false, error: `Unknown layer: ${layerKey}. Available layers: ${Object.keys(this.layers).join(', ')}` };
+        }
+        if (!config.isVector) {
+            return { success: false, error: `Layer '${layerKey}' is a raster layer and does not support paint styling. Only vector layers (ramsar, wdpa, hydrobasins) can be styled.` };
+        }
+
+        if (!window.map || !window.map.getLayer) {
+            return { success: false, error: 'Map not yet initialized' };
+        }
+
+        try {
+            // Determine which layer ID(s) to apply the property to
+            // fill-* properties go to fill layers, line-* properties go to line/outline layers
+            const isFillProperty = property.startsWith('fill-');
+            const isLineProperty = property.startsWith('line-');
+
+            for (const layerId of config.layerIds) {
+                if (window.map.getLayer(layerId)) {
+                    const layerType = window.map.getLayer(layerId).type;
+
+                    // Apply fill properties to fill layers, line properties to line layers
+                    if ((isFillProperty && layerType === 'fill') ||
+                        (isLineProperty && layerType === 'line')) {
+                        window.map.setPaintProperty(layerId, property, value);
+                        console.log(`[MapController] Paint property '${property}' set on layer '${layerId}':`, value);
+                    }
+                }
+            }
+
+            // Build a human-readable description
+            let description;
+            if (Array.isArray(value) && value[0] === 'match') {
+                const prop = value[1][1]; // ["get", "property_name"] -> property_name
+                description = `Coloring by ${prop}`;
+            } else if (Array.isArray(value) && value[0] === 'interpolate') {
+                const prop = value[2][1]; // ["get", "property_name"]
+                description = `Gradient coloring by ${prop}`;
+            } else if (Array.isArray(value) && value[0] === 'step') {
+                const prop = value[1][1]; // ["get", "property_name"]
+                description = `Stepped coloring by ${prop}`;
+            } else {
+                description = `Set ${property} to ${typeof value === 'string' ? value : JSON.stringify(value)}`;
+            }
+
+            return {
+                success: true,
+                layer: layerKey,
+                displayName: config.displayName,
+                property: property,
+                value: value,
+                description: description
+            };
+        } catch (error) {
+            console.error('[MapController] Error setting paint property:', error);
+            return { success: false, error: `Failed to apply paint property: ${error.message}` };
+        }
+    },
+
+    // Reset paint properties to defaults for a vector layer
+    resetLayerPaint: function (layerKey) {
+        const config = this.layers[layerKey];
+        if (!config) {
+            return { success: false, error: `Unknown layer: ${layerKey}` };
+        }
+        if (!config.isVector) {
+            return { success: false, error: `Layer '${layerKey}' is a raster layer and does not support paint styling` };
+        }
+
+        if (!window.map || !window.map.getLayer) {
+            return { success: false, error: 'Map not yet initialized' };
+        }
+
+        const defaults = this.defaultPaint[layerKey];
+        if (!defaults) {
+            return { success: false, error: `No default paint properties defined for layer: ${layerKey}` };
+        }
+
+        try {
+            for (const layerId of config.layerIds) {
+                if (window.map.getLayer(layerId)) {
+                    const layerType = window.map.getLayer(layerId).type;
+
+                    if (layerType === 'fill') {
+                        if (defaults['fill-color']) {
+                            window.map.setPaintProperty(layerId, 'fill-color', defaults['fill-color']);
+                        }
+                        if (defaults['fill-opacity']) {
+                            window.map.setPaintProperty(layerId, 'fill-opacity', defaults['fill-opacity']);
+                        }
+                    } else if (layerType === 'line') {
+                        if (defaults['line-color']) {
+                            window.map.setPaintProperty(layerId, 'line-color', defaults['line-color']);
+                        }
+                        if (defaults['line-width']) {
+                            window.map.setPaintProperty(layerId, 'line-width', defaults['line-width']);
+                        }
+                    }
+                    console.log(`[MapController] Paint reset to defaults on layer '${layerId}'`);
+                }
+            }
+
+            return {
+                success: true,
+                layer: layerKey,
+                displayName: config.displayName,
+                message: 'Paint properties reset to defaults'
+            };
+        } catch (error) {
+            console.error('[MapController] Error resetting paint:', error);
+            return { success: false, error: error.message };
+        }
     }
 };
 
