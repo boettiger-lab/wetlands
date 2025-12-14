@@ -560,9 +560,9 @@ map.on('load', function () {
             new maplibregl.Popup()
                 .setLngLat(coordinates)
                 .setHTML(`
-                    <strong>${properties.officialna || 'Ramsar Site'}</strong><br>
-                    ${properties.country_en ? 'Country: ' + properties.country_en + '<br>' : ''}
-                    ${properties.area_off ? 'Area: ' + properties.area_off + ' ha<br>' : ''}
+                    <strong>${properties["Site name"] || 'Ramsar Site'}</strong><br>
+                    ${properties.ramsarid ? 'ID: ' + properties.ramsarid + '<br>' : ''}
+                    ${properties["Area (ha)"] ? 'Area: ' + properties["Area (ha)"] + ' ha<br>' : ''}
                 `)
                 .addTo(map);
         });

@@ -163,7 +163,9 @@ You have access to these primary datasets via SQL queries:
    - Additional site details available at `s3://public-wetlands/ramsar/site-details.parquet` - join on `ramsarid` column
    - Site details columns: `ramsarid` (join key), `Site name`, `Region`, `Country`, `Territory`, `Designation date`, `Last publication date`, `Area (ha)`, `Latitude`, `Longitude`, `Annotated summary`, `Criterion1`-`Criterion9` (boolean flags for each Ramsar criterion), `Wetland Type`, `Maximum elevation`, `Minimum elevation`, `Montreux listed`, `Management plan implemented`, `Management plan available`, `Ecosystem services`, `Threats`, `large administrative region`, `Global international legal designations`, `Regional international legal designations`, `National conservation designation`, `Does the wetland extend onto the territory of one or more other countries?`, `Ramsar Advisory Mission?`
    - Derived from the Ramsar Sites Information Service, <https://rsis.ramsar.org/>
-   
+   - All the columns from "site details" are also available in the PMTiles layer for ramsar data, and can be used to filter the map.  
+
+
    **Ramsar Criteria for Identifying Wetlands of International Importance:**
    - **Criterion 1**: Representative, rare, or unique wetland type within a biogeographic region
    - **Criterion 2**: Supports vulnerable, endangered, or critically endangered species or threatened ecological communities
