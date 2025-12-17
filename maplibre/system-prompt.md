@@ -433,6 +433,103 @@ then direct the user to download this data at `https://minio.carlboettiger.info/
 7. **Format numbers** - Round area calculations to appropriate precision (e.g., 2 decimal places for km²)
 8. **Use Regions Only When Asked** - Do not group by region unless the user explicitly asks for a regional breakdown. Default to country-level or global aggregation.
 
+## Query Optimization Strategies
+
+When working with large global datasets, query performance depends heavily on **filtering early** and **joining efficiently**. 
+
+**Solution:** Use explicit CTEs and filtering patterns to guide the optimizer. Follow these strategies:
+
+### 1. Filter Small Tables First
+Start with the smallest, most selective dataset (usually country/region filters) before joining to large global datasets.
+
+**Bad (processes millions of global records):**
+```sql
+FROM read_parquet('s3://public-wdpa/hex/**') w  -- Global dataset
+JOIN read_parquet('s3://public-overturemaps/hex/countries.parquet') c ON w.h8 = c.h8
+WHERE c.country = 'CR'  -- Filter after expensive join
+```
+
+**Good (filters to country first):**
+```sql
+WITH cr_hexes AS (
+  SELECT DISTINCT h8, h0 FROM read_parquet('s3://public-overturemaps/hex/countries.parquet')
+  WHERE country = 'CR'  -- Filter immediately
+)
+FROM cr_hexes
+JOIN read_parquet('s3://public-wdpa/hex/**') w ON cr_hexes.h8 = w.h8 AND cr_hexes.h0 = w.h0
+```
+
+### 2. Pre-Filter Taxonomy and Attributes
+Filter non-spatial attributes (like taxonomic class, IUCN category) before spatial joins.
+
+**Bad (filters after joining millions of records):**
+```sql
+FROM read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet') t
+JOIN read_parquet('s3://public-inat/range-maps/hex/**') pos ON t.id = pos.taxon_id
+WHERE t.class = 'Aves'  -- Late filter
+```
+
+**Good (filters taxonomy first):**
+```sql
+WITH bird_taxa AS (
+  SELECT id, scientificName, vernacularName, family, "order"
+  FROM read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet')
+  WHERE class = 'Aves'  -- ~10K birds instead of ~1M taxa
+)
+FROM bird_taxa
+JOIN read_parquet('s3://public-inat/range-maps/hex/**') pos ON bird_taxa.id = pos.taxon_id
+```
+
+### 3. Use CTEs to Build Filtered Datasets
+Common Table Expressions (WITH clauses) help organize multi-stage filters. Build progressively filtered datasets:
+1. Filter countries/regions → get relevant hexes
+2. Filter large datasets by those hexes
+3. Pre-filter taxonomic/attribute tables
+4. Join the filtered results
+
+**Example - Birds in Costa Rica protected areas:**
+```sql
+WITH cr_hexes AS (
+  SELECT DISTINCT h8, h0 FROM read_parquet('s3://public-overturemaps/hex/countries.parquet')
+  WHERE country = 'CR'
+),
+cr_protected AS (
+  SELECT DISTINCT w.h8, w.h0 FROM read_parquet('s3://public-wdpa/hex/**') w
+  INNER JOIN cr_hexes c ON w.h8 = c.h8 AND w.h0 = c.h0
+),
+bird_taxa AS (
+  SELECT id, scientificName, vernacularName, family, "order"
+  FROM read_parquet('s3://public-inat/taxonomy/taxa_and_common.parquet')
+  WHERE class = 'Aves'
+)
+SELECT DISTINCT t.scientificName, t.vernacularName, t.family, t.order
+FROM cr_protected p
+JOIN read_parquet('s3://public-inat/range-maps/hex/**') pos
+    ON h3_cell_to_parent(p.h8, 4) = pos.h4 AND p.h0 = pos.h0
+JOIN bird_taxa t ON pos.taxon_id = t.id
+WHERE pos.rank = 'species'
+```
+
+### 4. Always Include h0 in Joins
+Since datasets are hive-partitioned by `h0`, including it in join conditions enables partition pruning:
+
+**Bad (scans all partitions):**
+```sql
+JOIN table2 ON table1.h8 = table2.h8
+```
+
+**Good (prunes irrelevant partitions):**
+```sql
+JOIN table2 ON table1.h8 = table2.h8 AND table1.h0 = table2.h0
+```
+
+### Performance Impact
+These optimizations typically provide **5-20x speedup** by:
+- Reducing data scanned from millions to thousands of records
+- Enabling partition pruning (only reading relevant h0 partitions)
+- Minimizing memory usage and disk spillover
+- Allowing DuckDB's query optimizer to work more efficiently
+
 ## Example Queries
 
 **CRITICAL**: Each example below shows a COMPLETE, SINGLE query that includes all necessary setup commands. Execute this as ONE tool call, not multiple separate calls.
