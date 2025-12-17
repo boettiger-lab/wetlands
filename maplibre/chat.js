@@ -524,56 +524,20 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
     }
 
     // Execute map tools immediately and show what was done
-    async executeMapToolsImmediately(toolCalls, currentTurnMessages) {
+    // Show brief UI feedback for map tool execution (non-blocking)
+    showMapToolExecution(toolName, functionArgs) {
         const messagesDiv = document.getElementById('chat-messages');
+        const mapActionDiv = document.createElement('div');
+        mapActionDiv.className = 'chat-message assistant';
+        mapActionDiv.style.opacity = '0.8';
+        mapActionDiv.style.fontSize = '14px';
 
-        for (const toolCall of toolCalls) {
-            const toolName = toolCall.function.name;
-            let functionArgs;
+        // Create a user-friendly description
+        const actionDesc = this.describeMapAction(toolName, functionArgs);
+        mapActionDiv.innerHTML = `🗺️ ${actionDesc}`;
 
-            try {
-                functionArgs = JSON.parse(toolCall.function.arguments);
-            } catch (e) {
-                console.error(`[Map Tool] Failed to parse arguments for ${toolName}:`, e);
-                currentTurnMessages.push({
-                    role: 'tool',
-                    tool_call_id: toolCall.id,
-                    content: JSON.stringify({ success: false, error: 'Invalid arguments' })
-                });
-                continue;
-            }
-
-            console.log(`[Map Tool] Executing ${toolName}...`);
-
-            const mapActionDiv = document.createElement('div');
-            mapActionDiv.className = 'chat-message assistant';
-            mapActionDiv.style.opacity = '0.8';
-            mapActionDiv.style.fontSize = '14px';
-
-            // Create a user-friendly description
-            let actionDesc = this.describeMapAction(toolName, functionArgs);
-            mapActionDiv.innerHTML = `🗺️ ${actionDesc}`;
-
-            messagesDiv.appendChild(mapActionDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-            // Execute the map tool
-            let toolResult;
-            try {
-                toolResult = this.executeLocalTool(toolName, functionArgs);
-                console.log(`[Map Tool] ✅ ${toolName} completed`);
-            } catch (err) {
-                console.error('[Map Tool] Execution error:', err);
-                toolResult = JSON.stringify({ success: false, error: err.message });
-            }
-
-            // Add result to conversation (for LLM context, not displayed)
-            currentTurnMessages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: toolResult
-            });
-        }
+        messagesDiv.appendChild(mapActionDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     // Create user-friendly descriptions of map actions
@@ -1075,20 +1039,15 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
                 toolCallCount++;
                 console.log(`[LLM] Tool calls requested (${toolCallCount}/${MAX_TOOL_CALLS}):`, message.tool_calls.length);
 
-                // Clear thinking indicator
-                this.clearThinking();
-
-                // Separate map tools from MCP tools
-                const mapToolCalls = message.tool_calls.filter(tc => this.isLocalTool(tc.function.name));
+                // Check if there are any MCP tools that need approval
+                const hasMCPTools = message.tool_calls.some(tc => !this.isLocalTool(tc.function.name));
                 const mcpToolCalls = message.tool_calls.filter(tc => !this.isLocalTool(tc.function.name));
 
-                // Execute map tools immediately (no approval needed)
-                if (mapToolCalls.length > 0) {
-                    await this.executeMapToolsImmediately(mapToolCalls, currentTurnMessages);
-                }
-
                 // Show approval prompt for MCP tools (SQL queries) if any
-                if (mcpToolCalls.length > 0) {
+                if (hasMCPTools) {
+                    // Clear thinking before showing approval UI
+                    this.clearThinking();
+
                     const approval = await this.showToolCallProposal(mcpToolCalls);
 
                     if (!approval.approved) {
@@ -1100,73 +1059,100 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
                             cancelled: true
                         };
                     }
+                } else {
+                    // Map tools only - clear thinking before executing
+                    this.clearThinking();
                 }
 
-                // Execute MCP tool calls (SQL queries) - map tools already executed
+                // Execute ALL tool calls in the order LLM requested them
+                // This maintains proper tool_call_id ordering for the LLM
                 const toolResults = [];
 
-                for (const toolCall of mcpToolCalls) {
-                    console.log('[MCP] Executing tool:', toolCall.function.name);
-                    console.log('[MCP] Tool arguments:', toolCall.function.arguments);
-                    console.log('[MCP] Tool call ID:', toolCall.id);
+                for (const toolCall of message.tool_calls) {
+                    const toolName = toolCall.function.name;
+                    const isMapTool = this.isLocalTool(toolName);
+
+                    console.log(`[Tool] Executing: ${toolName} (${isMapTool ? 'map' : 'MCP'})`);
 
                     let functionArgs;
                     try {
                         functionArgs = JSON.parse(toolCall.function.arguments);
                     } catch (e) {
-                        console.error('[MCP] Failed to parse tool arguments:', e);
+                        console.error(`[Tool] Failed to parse arguments for ${toolName}:`, e);
                         const errorMsg = "Error: Failed to parse tool arguments. Please ensure arguments are valid JSON.";
                         currentTurnMessages.push({
                             role: 'tool',
                             tool_call_id: toolCall.id,
                             content: errorMsg
                         });
-                        toolResults.push(errorMsg);
+                        if (!isMapTool) toolResults.push(errorMsg);
                         continue;
                     }
 
-                    // Capture the SQL query
-                    if (functionArgs.query) {
-                        this.currentTurnQueries.push(functionArgs.query);
-                        console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
-                    }
+                    if (isMapTool) {
+                        // Execute map tool silently - show brief UI feedback
+                        this.showMapToolExecution(toolName, functionArgs);
 
-                    // Check if the query argument is missing or empty
-                    if (!functionArgs.query || functionArgs.query.trim() === '') {
-                        console.warn('[MCP] ⚠️  WARNING: Tool call missing or empty "query" argument!');
-                        const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
+                        let toolResult;
+                        try {
+                            toolResult = this.executeLocalTool(toolName, functionArgs);
+                            console.log(`[Map Tool] ✅ ${toolName} completed`);
+                        } catch (err) {
+                            console.error('[Map Tool] Execution error:', err);
+                            toolResult = JSON.stringify({ success: false, error: err.message });
+                        }
+
+                        // Add result to conversation (for LLM context, not displayed to user)
                         currentTurnMessages.push({
                             role: 'tool',
                             tool_call_id: toolCall.id,
-                            content: errorMsg
+                            content: toolResult
                         });
-                        toolResults.push(errorMsg);
-                        continue;
-                    }
+                    } else {
+                        // Execute MCP tool (database query)
+                        // Capture the SQL query
+                        if (functionArgs.query) {
+                            this.currentTurnQueries.push(functionArgs.query);
+                            console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
+                        }
 
-                    // Execute the query via MCP
-                    console.log('[MCP] Executing query via MCP...');
-                    let queryResult;
-                    try {
-                        queryResult = await this.executeMCPQuery(functionArgs.query);
-                        console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
-                        toolResults.push(queryResult);
-                    } catch (err) {
-                        console.error('[MCP] Execution error:', err);
-                        queryResult = `Error executing query: ${err.message}`;
-                        toolResults.push(queryResult);
-                    }
+                        // Check if the query argument is missing or empty
+                        if (!functionArgs.query || functionArgs.query.trim() === '') {
+                            console.warn('[MCP] ⚠️  WARNING: Tool call missing or empty "query" argument!');
+                            const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
+                            currentTurnMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                content: errorMsg
+                            });
+                            toolResults.push(errorMsg);
+                            continue;
+                        }
 
-                    // Add tool result to messages
-                    currentTurnMessages.push({
-                        role: 'tool',
-                        tool_call_id: toolCall.id,
-                        content: queryResult
-                    });
+                        // Execute the query via MCP
+                        console.log('[MCP] Executing query via MCP...');
+                        let queryResult;
+                        try {
+                            queryResult = await this.executeMCPQuery(functionArgs.query);
+                            console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
+                            toolResults.push(queryResult);
+                        } catch (err) {
+                            console.error('[MCP] Execution error:', err);
+                            queryResult = `Error executing query: ${err.message}`;
+                            toolResults.push(queryResult);
+                        }
+
+                        // Add tool result to messages
+                        currentTurnMessages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: queryResult
+                        });
+                    }
                 }
 
-                // Remove the running button now that query is complete (only if there were MCP tools)
-                if (mcpToolCalls.length > 0) {
+                // Remove the running button now that execution is complete (only if there were MCP tools)
+                if (hasMCPTools) {
                     const proposalDivs = document.querySelectorAll('.tool-proposal');
                     if (proposalDivs.length > 0) {
                         const latestProposal = proposalDivs[proposalDivs.length - 1];
@@ -1188,8 +1174,9 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
                     // Ask if should continue
                     await this.askContinue();
                 } else {
-                    // Map tools only - no need to show results or ask to continue
+                    // Map tools only - show thinking before next LLM turn
                     console.log('[Map Tools] Map tools executed, continuing to next LLM turn');
+                    this.showThinking();
                 }
 
                 // Loop continues to next iteration to send tool results back to LLM

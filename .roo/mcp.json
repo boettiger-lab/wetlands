@@ -1,15 +1,1 @@
-{
-    "mcpServers": {
-        "wetlands-biodiversity": {
-            "type": "sse",
-            "url": "https://biodiversity-mcp.nrp-nautilus.io/sse"
-        },
-        "mcp-server-chart": {
-            "command": "npx",
-            "args": [
-                "-y",
-                "@antv/mcp-server-chart"
-            ]
-        }
-    }
-}
+{"mcpServers":{"wetlands-biodiversity":{"type":"sse","url":"https://biodiversity-mcp.nrp-nautilus.io/sse","alwaysAllow":[]},"mcp-server-chart":{"command":"npx","args":["-y","@antv/mcp-server-chart"]}}}

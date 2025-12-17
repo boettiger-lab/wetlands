@@ -39,12 +39,6 @@ data:
                 "api_key": "${OPENROUTER_KEY}"
             },
             {
-                "value": "allenai/olmo-3.1-32b-think:free",
-                "label": "olmo3.1-32b",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "api_key": "${OPENROUTER_KEY}"
-            },
-            {
                 "value": "qwen/qwen3-next-80b-a3b-thinking",
                 "label": "qwen3-next",
                 "endpoint": "https://openrouter.ai/api/v1",
@@ -57,11 +51,23 @@ data:
                 "api_key": "${OPENROUTER_KEY}"
             },
             {
+                "value": "openai/gpt-5.2",
+                "label": "gpt-5.2",
+                "endpoint": "https://openrouter.ai/api/v1",
+                "api_key": "${OPENROUTER_KEY}"
+            },       
+            {
                 "value": "openai/gpt-oss-120b",
                 "label": "gpt-oss-120b",
                 "endpoint": "https://openrouter.ai/api/v1",
                 "api_key": "${OPENROUTER_KEY}"
-            }            
+            },
+            {
+                "value": "nex-agi/deepseek-v3.1-nex-n1:free",
+                "label": "deepseek-v3.1-nex",
+                "endpoint": "https://openrouter.ai/api/v1",
+                "api_key": "${OPENROUTER_KEY}"
+            } 
             
         ]
     }
@@ -88,9 +94,9 @@ data:
         location / {
             try_files $uri $uri/ /index.html;
             # Disable all caching for development
-            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
-            add_header Pragma "no-cache";
-            add_header Expires "0";
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
+            add_header Pragma "no-cache" always;
+            add_header Expires "0" always;
         }
 
         # Health check endpoint
