@@ -29,7 +29,7 @@ window.MapController = {
         },
         'ramsar': {
             displayName: 'Ramsar Wetland Sites',
-            layerIds: ['ramsar-layer', 'ramsar-outline'],
+            layerIds: ['ramsar-layer'],
             checkboxId: 'ramsar-layer',
             hasLegend: false,
             isVector: true,
@@ -697,22 +697,6 @@ map.on('load', function () {
             }
         });
 
-        map.addLayer({
-            'id': 'ramsar-outline',
-            'type': 'line',
-            'source': 'ramsar-source',
-            'source-layer': 'ramsar',
-            'minzoom': 0,
-            'maxzoom': 22,
-            'paint': {
-                'line-color': '#8B008B',
-                'line-width': 2
-            },
-            'layout': {
-                'visibility': 'none'
-            }
-        });
-
         // Add click popup for Ramsar sites
         map.on('click', 'ramsar-layer', (e) => {
             const coordinates = e.lngLat;
@@ -900,7 +884,6 @@ map.on('load', function () {
             ramsarCheckbox.addEventListener('change', function () {
                 const visibility = this.checked ? 'visible' : 'none';
                 map.setLayoutProperty('ramsar-layer', 'visibility', visibility);
-                map.setLayoutProperty('ramsar-outline', 'visibility', visibility);
             });
         }
 
@@ -940,7 +923,6 @@ function switchBaseLayer(styleName) {
         map.getLayoutProperty('carbon-layer', 'visibility') !== 'none' : false;
     const ramsarVisible = map.getLayer('ramsar-layer') ?
         map.getLayoutProperty('ramsar-layer', 'visibility') !== 'none' : false;
-    const ramsarOutlineVisible = ramsarVisible;
     const wdpaVisible = map.getLayer('wdpa-layer') ?
         map.getLayoutProperty('wdpa-layer', 'visibility') !== 'none' : false;
     const wdpaOutlineVisible = wdpaVisible;
@@ -1049,22 +1031,8 @@ function switchBaseLayer(styleName) {
             }
         });
 
-        map.addLayer({
-            'id': 'ramsar-outline',
-            'type': 'line',
-            'source': 'ramsar-source',
-            'source-layer': 'ramsar',
-            'minzoom': 0,
-            'maxzoom': 22,
-            'paint': {
-                'line-color': '#8B008B',
-                'line-width': 2
-            }
-        });
-
         if (!ramsarVisible) {
             map.setLayoutProperty('ramsar-layer', 'visibility', 'none');
-            map.setLayoutProperty('ramsar-outline', 'visibility', 'none');
             document.getElementById('ramsar-layer').checked = false;
         }
 
