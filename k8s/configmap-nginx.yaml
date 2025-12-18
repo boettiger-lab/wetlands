@@ -6,7 +6,7 @@ data:
   config.template.json: |
     {
         "mcp_server_url": "${MCP_SERVER_URL}",
-        "llm_model": "devstral",
+        "llm_model": "anthropic/claude-sonnet-4.5",
         "llm_models": [
             {
                 "value": "glm-4.6",

@@ -103,7 +103,7 @@ The filter must be a valid MapLibre filter expression array. Common patterns:
 
 WDPA layer properties: IUCN_CAT (Ia, Ib, II, III, IV, V, VI), ISO3, DESIG_ENG, STATUS, STATUS_YR, GIS_AREA, NAME_ENG
 Ramsar layer properties: officialna, iso3, country_en, area_off, Criterion1-Criterion9 (boolean)
-HydroBASINS properties: PFAF_ID, UP_AREA, SUB_AREA, MAIN_BAS`,
+HydroBASINS properties: HYBAS_ID, PFAF_ID, UP_AREA, SUB_AREA, MAIN_BAS`,
                 inputSchema: {
                     type: 'object',
                     properties: {
@@ -191,7 +191,7 @@ Common patterns for fill-color:
 
 WDPA useful properties for coloring: OWN_TYPE (ownership), IUCN_CAT (IUCN category), GOV_TYPE (governance), DESIG_TYPE (designation type)
 Ramsar useful properties: ramsarid (unique site ID), Site name (site name), iso3/Country (country), Region (geographic region), Wetland Type (wetland classification), Criterion1-Criterion9 (boolean criteria), Montreux listed (conservation status), Management plan implemented (management status)
-HydroBASINS useful properties: SUB_AREA (basin size), UP_AREA (upstream area)
+HydroBASINS useful properties: HYBAS_ID (basin ID), PFAF_ID (Pfafstetter code), SUB_AREA (basin size), UP_AREA (upstream area), MAIN_BAS (main basin)
 
 Example: Color WDPA by ownership type:
   property: "fill-color"
