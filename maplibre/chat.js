@@ -848,372 +848,387 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
             return { response: "Sorry, the database connection is not available. Please refresh the page to try again." };
         }
 
-        // Get current model configuration
-        const modelConfig = this.getCurrentModelConfig();
+        try {
+            // Get current model configuration
+            const modelConfig = this.getCurrentModelConfig();
 
-        // Check if model explicitly requests Responses API
-        const useResponsesAPI = modelConfig.use_responses_api === true;
+            // Check if model explicitly requests Responses API
+            const useResponsesAPI = modelConfig.use_responses_api === true;
 
-        // Build full endpoint URL
-        let endpoint = modelConfig.endpoint;
-        if (useResponsesAPI) {
-            // Model explicitly configured to use Responses API
-            if (!endpoint.endsWith('/responses')) {
-                endpoint = endpoint.replace(/\/$/, '') + '/responses';
-            }
-        } else {
-            // Default: use Chat Completions API
-            if (!endpoint.endsWith('/chat/completions')) {
-                endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
-            }
-        }
-        console.log('[LLM] Starting request to:', endpoint);
-        console.log('[LLM] Using model config:', { model: modelConfig.value, endpoint: modelConfig.endpoint });
-        console.log('[LLM] Origin:', window.location.origin);
-
-        // Track ALL SQL queries executed in this turn
-        this.currentTurnQueries = [];
-
-        // Build the prompt with system context
-        // We will maintain this conversation history for the duration of this turn
-        let currentTurnMessages = [
-            {
-                role: 'system',
-                content: this.systemPrompt
-            },
-            ...this.messages.slice(-10), // Keep last 10 messages for context
-            {
-                role: 'user',
-                content: userMessage
-            }
-        ];
-
-        // Convert MCP tools to OpenAI function format
-        console.log('[LLM] Raw MCP tools available:', this.mcpTools?.length || 0);
-        console.log('[LLM] Local tools available:', this.localTools?.length || 0);
-
-        // Check if MCP tools are available (local tools are always available)
-        if (!this.mcpTools || this.mcpTools.length === 0) {
-            console.warn('[LLM] ⚠️ No MCP tools available - database queries will not work');
-            // Continue anyway since we have local tools for map control
-        }
-
-        // Convert MCP tools to OpenAI function format
-        const mcpToolsFormatted = (this.mcpTools || []).map(tool => ({
-            type: 'function',
-            function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.inputSchema || {
-                    type: 'object',
-                    properties: {
-                        query: {
-                            type: 'string',
-                            description: 'SQL query to execute'
-                        }
-                    },
-                    required: ['query']
+            // Build full endpoint URL
+            let endpoint = modelConfig.endpoint;
+            if (useResponsesAPI) {
+                // Model explicitly configured to use Responses API
+                if (!endpoint.endsWith('/responses')) {
+                    endpoint = endpoint.replace(/\/$/, '') + '/responses';
+                }
+            } else {
+                // Default: use Chat Completions API
+                if (!endpoint.endsWith('/chat/completions')) {
+                    endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
                 }
             }
-        }));
+            console.log('[LLM] Starting request to:', endpoint);
+            console.log('[LLM] Using model config:', { model: modelConfig.value, endpoint: modelConfig.endpoint });
+            console.log('[LLM] Origin:', window.location.origin);
 
-        // Convert local tools to OpenAI function format
-        const localToolsFormatted = this.localTools.map(tool => ({
-            type: 'function',
-            function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.inputSchema
-            }
-        }));
+            // Track ALL SQL queries executed in this turn
+            this.currentTurnQueries = [];
 
-        // Combine all tools
-        const tools = [...mcpToolsFormatted, ...localToolsFormatted];
+            // Build the prompt with system context
+            // We will maintain this conversation history for the duration of this turn
+            let currentTurnMessages = [
+                {
+                    role: 'system',
+                    content: this.systemPrompt
+                },
+                ...this.messages.slice(-10), // Keep last 10 messages for context
+                {
+                    role: 'user',
+                    content: userMessage
+                }
+            ];
 
-        console.log('[LLM] Converted tools:', JSON.stringify(tools, null, 2));
+            // Convert MCP tools to OpenAI function format
+            console.log('[LLM] Raw MCP tools available:', this.mcpTools?.length || 0);
+            console.log('[LLM] Local tools available:', this.localTools?.length || 0);
 
-        let toolCallCount = 0;
-        const MAX_TOOL_CALLS = 8; // Guardrail: Allow up to 8 tool calls per user message
-
-        while (toolCallCount < MAX_TOOL_CALLS) {
-            // Build request payload - conditional format based on model
-            let requestPayload;
-            if (useResponsesAPI) {
-                // Responses API format
-                // Convert messages to a single input string
-                const inputText = currentTurnMessages.map(msg => {
-                    if (msg.role === 'system') return `System: ${msg.content}`;
-                    if (msg.role === 'user') return `User: ${msg.content}`;
-                    if (msg.role === 'assistant') return `Assistant: ${msg.content}`;
-                    if (msg.role === 'tool') return `Tool Result: ${msg.content}`;
-                    return '';
-                }).filter(Boolean).join('\n\n');
-
-                requestPayload = {
-                    model: this.selectedModel,
-                    input: inputText,
-                    tools: tools,
-                    tool_choice: 'auto'
-                };
-            } else {
-                // Chat Completions API format for other models
-                requestPayload = {
-                    model: this.selectedModel,
-                    messages: currentTurnMessages,
-                    tools: tools,
-                    tool_choice: 'auto'
-                };
+            // Check if MCP tools are available (local tools are always available)
+            if (!this.mcpTools || this.mcpTools.length === 0) {
+                console.warn('[LLM] ⚠️ No MCP tools available - database queries will not work');
+                // Continue anyway since we have local tools for map control
             }
 
-            console.log(`[LLM] Request payload (Step ${toolCallCount + 1}):`, {
-                model: requestPayload.model,
-                messageCount: requestPayload.messages?.length || 'N/A (using input string)',
-                toolCount: requestPayload.tools.length
-            });
-
-            // Call the LLM proxy
-            console.log('[LLM] Sending fetch request...');
-            const startTime = Date.now();
-
-            // Prepare headers with proxy authentication
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${modelConfig.api_key}`
-            };
-
-            console.log('[LLM] Using API key from model config');
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(requestPayload)
-            });
-
-            const elapsed = Date.now() - startTime;
-            console.log(`[LLM] Response received after ${elapsed}ms, status: ${response.status}`);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[LLM] Error response body:', errorText);
-                throw new Error(`LLM API error (${response.status}): ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            let message;
-
-            if (useResponsesAPI) {
-                // Parse Responses API format
-                // Responses API returns output array with text and function_call items
-                const output = data.output || [];
-
-                // Extract text content
-                const textItems = output.filter(item => item.type === 'text');
-                const content = textItems.map(item => item.text).join('');
-
-                // Extract function calls
-                const functionCallItems = output.filter(item => item.type === 'function_call');
-                const toolCalls = functionCallItems.map(item => ({
-                    id: item.id || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    type: 'function',
-                    function: {
-                        name: item.name,
-                        arguments: JSON.stringify(item.arguments)
+            // Convert MCP tools to OpenAI function format
+            const mcpToolsFormatted = (this.mcpTools || []).map(tool => ({
+                type: 'function',
+                function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.inputSchema || {
+                        type: 'object',
+                        properties: {
+                            query: {
+                                type: 'string',
+                                description: 'SQL query to execute'
+                            }
+                        },
+                        required: ['query']
                     }
-                }));
+                }
+            }));
 
-                message = {
-                    role: 'assistant',
-                    content: content || null,
-                    tool_calls: toolCalls.length > 0 ? toolCalls : undefined
-                };
-            } else {
-                // Parse Chat Completions API format
-                message = data.choices[0].message;
-            }
+            // Convert local tools to OpenAI function format
+            const localToolsFormatted = this.localTools.map(tool => ({
+                type: 'function',
+                function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.inputSchema
+                }
+            }));
 
-            // Add the assistant's response to the conversation history
-            currentTurnMessages.push(message);
+            // Combine all tools
+            const tools = [...mcpToolsFormatted, ...localToolsFormatted];
 
-            // Check if LLM wants to call a tool
-            if (message.tool_calls && message.tool_calls.length > 0) {
-                toolCallCount++;
-                console.log(`[LLM] Tool calls requested (${toolCallCount}/${MAX_TOOL_CALLS}):`, message.tool_calls.length);
+            console.log('[LLM] Converted tools:', JSON.stringify(tools, null, 2));
 
-                // Check if there are any MCP tools that need approval
-                const hasMCPTools = message.tool_calls.some(tc => !this.isLocalTool(tc.function.name));
-                const mcpToolCalls = message.tool_calls.filter(tc => !this.isLocalTool(tc.function.name));
+            let toolCallCount = 0;
+            const MAX_TOOL_CALLS = 8; // Guardrail: Allow up to 8 tool calls per user message
 
-                // Show approval prompt for MCP tools (SQL queries) if any
-                if (hasMCPTools) {
-                    // Clear thinking before showing approval UI
-                    this.clearThinking();
+            while (toolCallCount < MAX_TOOL_CALLS) {
+                // Build request payload - conditional format based on model
+                let requestPayload;
+                if (useResponsesAPI) {
+                    // Responses API format
+                    // Convert messages to a single input string
+                    const inputText = currentTurnMessages.map(msg => {
+                        if (msg.role === 'system') return `System: ${msg.content}`;
+                        if (msg.role === 'user') return `User: ${msg.content}`;
+                        if (msg.role === 'assistant') return `Assistant: ${msg.content}`;
+                        if (msg.role === 'tool') return `Tool Result: ${msg.content}`;
+                        return '';
+                    }).filter(Boolean).join('\n\n');
 
-                    const approval = await this.showToolCallProposal(mcpToolCalls);
-
-                    if (!approval.approved) {
-                        console.log('[User] Tool call rejected by user');
-                        this.addMessage('system', 'Tool call cancelled. You can ask a different question or modify your request.');
-                        return {
-                            response: null,
-                            sqlQueries: this.currentTurnQueries,
-                            cancelled: true
-                        };
-                    }
+                    requestPayload = {
+                        model: this.selectedModel,
+                        input: inputText,
+                        tools: tools,
+                        tool_choice: 'auto'
+                    };
                 } else {
-                    // Map tools only - clear thinking before executing
-                    this.clearThinking();
+                    // Chat Completions API format for other models
+                    requestPayload = {
+                        model: this.selectedModel,
+                        messages: currentTurnMessages,
+                        tools: tools,
+                        tool_choice: 'auto'
+                    };
                 }
 
-                // Execute ALL tool calls in the order LLM requested them
-                // This maintains proper tool_call_id ordering for the LLM
-                const toolResults = [];
+                console.log(`[LLM] Request payload (Step ${toolCallCount + 1}):`, {
+                    model: requestPayload.model,
+                    messageCount: requestPayload.messages?.length || 'N/A (using input string)',
+                    toolCount: requestPayload.tools.length
+                });
 
-                for (const toolCall of message.tool_calls) {
-                    const toolName = toolCall.function.name;
-                    const isMapTool = this.isLocalTool(toolName);
+                // Call the LLM proxy
+                console.log('[LLM] Sending fetch request...');
+                const startTime = Date.now();
 
-                    console.log(`[Tool] Executing: ${toolName} (${isMapTool ? 'map' : 'MCP'})`);
+                // Prepare headers with proxy authentication
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${modelConfig.api_key}`
+                };
 
-                    let functionArgs;
-                    try {
-                        functionArgs = JSON.parse(toolCall.function.arguments);
-                    } catch (e) {
-                        console.error(`[Tool] Failed to parse arguments for ${toolName}:`, e);
-                        const errorMsg = "Error: Failed to parse tool arguments. Please ensure arguments are valid JSON.";
-                        currentTurnMessages.push({
-                            role: 'tool',
-                            tool_call_id: toolCall.id,
-                            content: errorMsg
-                        });
-                        if (!isMapTool) toolResults.push(errorMsg);
-                        continue;
+                console.log('[LLM] Using API key from model config');
+
+                // Create AbortController with 5-minute timeout for all models
+                const abortController = new AbortController();
+                const timeoutId = setTimeout(() => abortController.abort(), 300000); // 5 minute timeout
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(requestPayload),
+                    signal: abortController.signal
+                });
+                clearTimeout(timeoutId); // Clear timeout on successful response
+
+                const elapsed = Date.now() - startTime;
+                console.log(`[LLM] Response received after ${elapsed}ms, status: ${response.status}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('[LLM] Error response body:', errorText);
+                    throw new Error(`LLM API error (${response.status}): ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                let message;
+
+                if (useResponsesAPI) {
+                    // Parse Responses API format
+                    // Responses API returns output array with text and function_call items
+                    const output = data.output || [];
+
+                    // Extract text content
+                    const textItems = output.filter(item => item.type === 'text');
+                    const content = textItems.map(item => item.text).join('');
+
+                    // Extract function calls
+                    const functionCallItems = output.filter(item => item.type === 'function_call');
+                    const toolCalls = functionCallItems.map(item => ({
+                        id: item.id || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        type: 'function',
+                        function: {
+                            name: item.name,
+                            arguments: JSON.stringify(item.arguments)
+                        }
+                    }));
+
+                    message = {
+                        role: 'assistant',
+                        content: content || null,
+                        tool_calls: toolCalls.length > 0 ? toolCalls : undefined
+                    };
+                } else {
+                    // Parse Chat Completions API format
+                    message = data.choices[0].message;
+                }
+
+                // Add the assistant's response to the conversation history
+                currentTurnMessages.push(message);
+
+                // Check if LLM wants to call a tool
+                if (message.tool_calls && message.tool_calls.length > 0) {
+                    toolCallCount++;
+                    console.log(`[LLM] Tool calls requested (${toolCallCount}/${MAX_TOOL_CALLS}):`, message.tool_calls.length);
+
+                    // Check if there are any MCP tools that need approval
+                    const hasMCPTools = message.tool_calls.some(tc => !this.isLocalTool(tc.function.name));
+                    const mcpToolCalls = message.tool_calls.filter(tc => !this.isLocalTool(tc.function.name));
+
+                    // Show approval prompt for MCP tools (SQL queries) if any
+                    if (hasMCPTools) {
+                        // Clear thinking before showing approval UI
+                        this.clearThinking();
+
+                        const approval = await this.showToolCallProposal(mcpToolCalls);
+
+                        if (!approval.approved) {
+                            console.log('[User] Tool call rejected by user');
+                            this.addMessage('system', 'Tool call cancelled. You can ask a different question or modify your request.');
+                            return {
+                                response: null,
+                                sqlQueries: this.currentTurnQueries,
+                                cancelled: true
+                            };
+                        }
+                    } else {
+                        // Map tools only - clear thinking before executing
+                        this.clearThinking();
                     }
 
-                    if (isMapTool) {
-                        // Execute map tool silently - show brief UI feedback
-                        this.showMapToolExecution(toolName, functionArgs);
+                    // Execute ALL tool calls in the order LLM requested them
+                    // This maintains proper tool_call_id ordering for the LLM
+                    const toolResults = [];
 
-                        let toolResult;
+                    for (const toolCall of message.tool_calls) {
+                        const toolName = toolCall.function.name;
+                        const isMapTool = this.isLocalTool(toolName);
+
+                        console.log(`[Tool] Executing: ${toolName} (${isMapTool ? 'map' : 'MCP'})`);
+
+                        let functionArgs;
                         try {
-                            toolResult = this.executeLocalTool(toolName, functionArgs);
-                            console.log(`[Map Tool] ✅ ${toolName} completed`);
-                        } catch (err) {
-                            console.error('[Map Tool] Execution error:', err);
-                            toolResult = JSON.stringify({ success: false, error: err.message });
-                        }
-
-                        // Add result to conversation (for LLM context, not displayed to user)
-                        currentTurnMessages.push({
-                            role: 'tool',
-                            tool_call_id: toolCall.id,
-                            content: toolResult
-                        });
-                    } else {
-                        // Execute MCP tool (database query)
-                        // Capture the SQL query
-                        if (functionArgs.query) {
-                            this.currentTurnQueries.push(functionArgs.query);
-                            console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
-                        }
-
-                        // Check if the query argument is missing or empty
-                        if (!functionArgs.query || functionArgs.query.trim() === '') {
-                            console.warn('[MCP] ⚠️  WARNING: Tool call missing or empty "query" argument!');
-                            const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
+                            functionArgs = JSON.parse(toolCall.function.arguments);
+                        } catch (e) {
+                            console.error(`[Tool] Failed to parse arguments for ${toolName}:`, e);
+                            const errorMsg = "Error: Failed to parse tool arguments. Please ensure arguments are valid JSON.";
                             currentTurnMessages.push({
                                 role: 'tool',
                                 tool_call_id: toolCall.id,
                                 content: errorMsg
                             });
-                            toolResults.push(errorMsg);
+                            if (!isMapTool) toolResults.push(errorMsg);
                             continue;
                         }
 
-                        // Execute the query via MCP
-                        console.log('[MCP] Executing query via MCP...');
-                        let queryResult;
-                        try {
-                            queryResult = await this.executeMCPQuery(functionArgs.query);
-                            console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
-                            toolResults.push(queryResult);
-                        } catch (err) {
-                            console.error('[MCP] Execution error:', err);
-                            queryResult = `Error executing query: ${err.message}`;
-                            toolResults.push(queryResult);
+                        if (isMapTool) {
+                            // Execute map tool silently - show brief UI feedback
+                            this.showMapToolExecution(toolName, functionArgs);
+
+                            let toolResult;
+                            try {
+                                toolResult = this.executeLocalTool(toolName, functionArgs);
+                                console.log(`[Map Tool] ✅ ${toolName} completed`);
+                            } catch (err) {
+                                console.error('[Map Tool] Execution error:', err);
+                                toolResult = JSON.stringify({ success: false, error: err.message });
+                            }
+
+                            // Add result to conversation (for LLM context, not displayed to user)
+                            currentTurnMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                content: toolResult
+                            });
+                        } else {
+                            // Execute MCP tool (database query)
+                            // Capture the SQL query
+                            if (functionArgs.query) {
+                                this.currentTurnQueries.push(functionArgs.query);
+                                console.log(`[SQL] ✅ SQL query ${this.currentTurnQueries.length} captured`);
+                            }
+
+                            // Check if the query argument is missing or empty
+                            if (!functionArgs.query || functionArgs.query.trim() === '') {
+                                console.warn('[MCP] ⚠️  WARNING: Tool call missing or empty "query" argument!');
+                                const errorMsg = "Error: The 'query' argument was missing or empty. Please provide a valid SQL query.";
+                                currentTurnMessages.push({
+                                    role: 'tool',
+                                    tool_call_id: toolCall.id,
+                                    content: errorMsg
+                                });
+                                toolResults.push(errorMsg);
+                                continue;
+                            }
+
+                            // Execute the query via MCP
+                            console.log('[MCP] Executing query via MCP...');
+                            let queryResult;
+                            try {
+                                queryResult = await this.executeMCPQuery(functionArgs.query);
+                                console.log(`[SQL] ✅ Query ${this.currentTurnQueries.length} completed`);
+                                toolResults.push(queryResult);
+                            } catch (err) {
+                                console.error('[MCP] Execution error:', err);
+                                queryResult = `Error executing query: ${err.message}`;
+                                toolResults.push(queryResult);
+                            }
+
+                            // Add tool result to messages
+                            currentTurnMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                content: queryResult
+                            });
+                        }
+                    }
+
+                    // Remove the running button now that execution is complete (only if there were MCP tools)
+                    if (hasMCPTools) {
+                        const proposalDivs = document.querySelectorAll('.tool-proposal');
+                        if (proposalDivs.length > 0) {
+                            const latestProposal = proposalDivs[proposalDivs.length - 1];
+                            const approvalButtonsDiv = latestProposal.querySelector('.tool-approval-buttons');
+                            if (approvalButtonsDiv) {
+                                approvalButtonsDiv.remove();
+                                console.log('[UI] Removed running button');
+                            }
                         }
 
-                        // Add tool result to messages
-                        currentTurnMessages.push({
-                            role: 'tool',
-                            tool_call_id: toolCall.id,
-                            content: queryResult
-                        });
-                    }
-                }
-
-                // Remove the running button now that execution is complete (only if there were MCP tools)
-                if (hasMCPTools) {
-                    const proposalDivs = document.querySelectorAll('.tool-proposal');
-                    if (proposalDivs.length > 0) {
-                        const latestProposal = proposalDivs[proposalDivs.length - 1];
-                        const approvalButtonsDiv = latestProposal.querySelector('.tool-approval-buttons');
-                        if (approvalButtonsDiv) {
-                            approvalButtonsDiv.remove();
-                            console.log('[UI] Removed running button');
+                        // Show results to user (for MCP tools only)
+                        if (toolResults.length > 0) {
+                            this.showToolResults(toolResults);
                         }
+
+                        // Show thinking indicator while LLM analyzes the results
+                        this.showThinking();
+
+                        // Ask if should continue
+                        await this.askContinue();
+                    } else {
+                        // Map tools only - show thinking before next LLM turn
+                        console.log('[Map Tools] Map tools executed, continuing to next LLM turn');
+                        this.showThinking();
                     }
 
-                    // Show results to user (for MCP tools only)
-                    if (toolResults.length > 0) {
-                        this.showToolResults(toolResults);
-                    }
-
-                    // Show thinking indicator while LLM analyzes the results
-                    this.showThinking();
-
-                    // Ask if should continue
-                    await this.askContinue();
+                    // Loop continues to next iteration to send tool results back to LLM
                 } else {
-                    // Map tools only - show thinking before next LLM turn
-                    console.log('[Map Tools] Map tools executed, continuing to next LLM turn');
-                    this.showThinking();
-                }
+                    // No tool calls, this is the final response
+                    console.log('[LLM] Returning direct message content (no tool calls)');
+                    const directContent = message.content;
 
-                // Loop continues to next iteration to send tool results back to LLM
-            } else {
-                // No tool calls, this is the final response
-                console.log('[LLM] Returning direct message content (no tool calls)');
-                const directContent = message.content;
+                    // Check for empty direct response
+                    if (!directContent || directContent.trim() === '') {
+                        console.warn('[LLM] ⚠️  WARNING: LLM returned empty direct content');
+                        return {
+                            response: 'I received your question but had trouble generating a response. Please try rephrasing or asking something else.',
+                            sqlQueries: this.currentTurnQueries
+                        };
+                    }
 
-                // Check for empty direct response
-                if (!directContent || directContent.trim() === '') {
-                    console.warn('[LLM] ⚠️  WARNING: LLM returned empty direct content');
+                    // Check for SQL as text (fallback check)
+                    if (directContent.toLowerCase().includes('select ') &&
+                        directContent.toLowerCase().includes('from ') &&
+                        this.currentTurnQueries.length === 0) {
+                        console.warn('[LLM] ⚠️  WARNING: LLM appears to be returning SQL as text instead of using tool call!');
+                    }
+
                     return {
-                        response: 'I received your question but had trouble generating a response. Please try rephrasing or asking something else.',
+                        response: directContent,
                         sqlQueries: this.currentTurnQueries
                     };
                 }
-
-                // Check for SQL as text (fallback check)
-                if (directContent.toLowerCase().includes('select ') &&
-                    directContent.toLowerCase().includes('from ') &&
-                    this.currentTurnQueries.length === 0) {
-                    console.warn('[LLM] ⚠️  WARNING: LLM appears to be returning SQL as text instead of using tool call!');
-                }
-
-                return {
-                    response: directContent,
-                    sqlQueries: this.currentTurnQueries
-                };
             }
-        }
 
-        // If we exit the loop, we hit the max tool calls limit
-        console.warn(`[LLM] ⚠️  Hit maximum tool call limit (${MAX_TOOL_CALLS})`);
-        return {
-            response: `I've reached the maximum number of steps (${MAX_TOOL_CALLS}) allowed to answer your question without finding a final answer. I may be getting stuck in a loop. Please try to be more specific or ask a simpler question.`,
-            sqlQueries: this.currentTurnQueries
-        };
+            // If we exit the loop, we hit the max tool calls limit
+            console.warn(`[LLM] ⚠️  Hit maximum tool call limit (${MAX_TOOL_CALLS})`);
+            return {
+                response: `I've reached the maximum number of steps (${MAX_TOOL_CALLS}) allowed to answer your question without finding a final answer. I may be getting stuck in a loop. Please try to be more specific or ask a simpler question.`,
+                sqlQueries: this.currentTurnQueries
+            };
+
+        } catch (error) {
+            console.error('[LLM] Error in queryLLM:', error);
+            return {
+                response: `Error: ${error.message}`,
+                sqlQueries: this.currentTurnQueries
+            };
+        }
     }
 
     async executeMCPQuery(sqlQuery, retryCount = 0) {

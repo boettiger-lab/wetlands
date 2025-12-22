@@ -218,13 +218,23 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
             latency_ms = int((time.time() - start_time) * 1000)
             error_detail = f"Provider returned {e.response.status_code}: {e.response.text[:200]}"
             log_response(provider_name, request.model, {}, latency_ms, error=error_detail)
-            raise HTTPException(status_code=500, detail=error_detail)
+            
+            # Pass through certain status codes to client
+            if e.response.status_code in [400, 401, 402, 403, 429]:
+                # Client errors and rate limits - pass through the original status
+                raise HTTPException(status_code=e.response.status_code, detail=error_detail)
+            else:
+                # Other errors become 502 Bad Gateway (more accurate than 500)
+                raise HTTPException(status_code=502, detail=error_detail)
             
         except Exception as e:
             latency_ms = int((time.time() - start_time) * 1000)
             error_detail = f"{type(e).__name__}: {str(e)}"
             log_response(provider_name, request.model, {}, latency_ms, error=error_detail)
-            raise HTTPException(status_code=500, detail=error_detail)
+            
+            # Use 502 Bad Gateway for connection errors (more accurate than 500)
+            # 500 should only be for internal proxy errors
+            raise HTTPException(status_code=502, detail=f"Connection error: {error_detail}")
 
 @app.post("/llm")
 async def proxy_llm(request: Request):

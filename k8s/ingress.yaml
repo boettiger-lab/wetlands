@@ -29,9 +29,6 @@ metadata:
     haproxy.org/timeout-server: "60s"
     haproxy.org/timeout-client: "60s"
     haproxy.org/timeout-connect: "10s"
-    
-    # Return CORS headers even on error responses
-    haproxy.org/error-files: "true"
 
 spec:
   ingressClassName: haproxy

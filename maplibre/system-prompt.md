@@ -188,6 +188,7 @@ You have access to these primary datasets via SQL queries:
    - Columns: ncp (a score between 0 and 1 representing greatest contributions to least) h8 (H3 hex ID), h0 hex id. 
    - Derived from "Mapping the planet's critical areas for biodiversity and nature's contributions to people", <https://doi.org/10.1038/s41467-023-43832-9>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
+   
 
 6. **World Protected Areas Database (WDPA)** (`s3://public-wdpa/hex/**`)
    - Columns: OBJECTID, SITE_ID, SITE_PID, SITE_TYPE, NAME_ENG, NAME, DESIG, DESIG_ENG, DESIG_TYPE, IUCN_CAT, INT_CRIT, REALM, REP_M_AREA, GIS_M_AREA, REP_AREA, GIS_AREA, NO_TAKE, NO_TK_AREA, STATUS, STATUS_YR, GOV_TYPE, GOVSUBTYPE, OWN_TYPE, OWNSUBTYPE, MANG_AUTH, MANG_PLAN, VERIF, METADATAID, PRNT_ISO3, ISO3, SUPP_INFO, CONS_OBJ, INLND_WTRS, OECM_ASMT, SHAPE_bbox, h8 (H3 hex ID), h0 (coarse hex ID)
@@ -235,7 +236,8 @@ in hectares), .  For additional information, use the site-details.parquet (join 
    - Use this dataset to analyze wetlands within specific watersheds, calculate drainage basin statistics, or understand hydrological connectivity
    - Derived from HydroBASINS, <https://www.hydrosheds.org/products/hydrobasins>
 
-9. **Species range maps from iNaturalist** (`s3://public-inat/range-maps/hex/**`)
+9. **Individual Species range maps from iNaturalist** (`s3://public-inat/range-maps/hex/**`)
+   - These maps should mostly be used for questions that involve specific species or species groups that cannot be answered with the IUCN data.
    - Columns are  taxon_id, parent_taxon_id, name, rank, and hexagon indices h0 to h4.
    - Use the taxonomy table `s3://public-inat/taxonomy/taxa_and_common.parquet` to identify specific species (e.g. Coyotes, `scientificName = Canis latrans`),
      or to identify species groups (Mammals, `class = "Mammalia"`). Some species can be identified by common name (vernacularName).  
@@ -243,15 +245,9 @@ in hectares), .  For additional information, use the site-details.parquet (join 
      'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'specificEpithet', 'infraspecificEpithet', 'modified', 'scientificName', 'taxonRank', and 'vernacularName'.
      Ask the user for classification information if you cannot determine it.
 
+10. **IUCN Species richness (`s3://public-iucn/richness/`)**
 
-You have access to a few additional datasets that are specific to the United States
-
-1. **USA Species Richness** (`https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`)
-   - Columns: richness (species count), h8 (H3 hex ID)
-   - This data is continental US only!
-   - Covers some 2000 threatened and endagered species, not all species.
-   - Derived from the NatureServe Map of Biodiversity Importance (MOBI)
-   - **NOTE** You can get individual rangemaps for over 100,000 sepcies anywhere on earth using the iNaturalist Range Maps.  You can combine range maps to estimate overall species richness or richness of specific species groups (i.e. Mammals).   See examples.  
+    - 
 
 
 ## H3 Geospatial Indexing
