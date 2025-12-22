@@ -56,12 +56,14 @@
                     <span>Protected Areas (WDPA)</span>
                 </label>
                 <label>
-                    <input id="hydrobasins5-layer" type="checkbox" name="rtoggle" value="hydrobasins5">
-                    <span>Catchments (HydroBASINS L5)</span>
-                </label>
-                <label>
                     <input id="hydrobasins-layer" type="checkbox" name="rtoggle" value="hydrobasins">
-                    <span>Sub-catchments (HydroBASINS L6)</span>
+                    <span>Watersheds (HydroBASINS)</span>
+                    <select id="hydrobasins-level" class="level-dropdown" title="Basin level">
+                        <option value="3" selected>L3</option>
+                        <option value="4">L4</option>
+                        <option value="5">L5</option>
+                        <option value="6">L6</option>
+                    </select>
                 </label>
             </div>
         </div>

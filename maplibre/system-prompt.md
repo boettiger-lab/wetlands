@@ -227,8 +227,8 @@ in hectares), .  For additional information, use the site-details.parquet (join 
    - **Criterion 9**: Regularly supports 1% of a population of one wetland-dependent non-avian animal species or subspecies
 
 
-8. **HydroBASINS Level 5 and 6 Watersheds** 
-   - These are available at two scales: Level 5 "Catchments" (`s3://public-hydrobasins/level_05/hexes/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/level_06/hexes/**`). 
+8. **HydroBASINS Level 3 - 6 Watersheds** 
+   - These are available from four scales: Level 3 "Major Basins" (`s3://public-hydrobasins/level_03/hexes/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/level_06/hexes/**`). 
    - Columns: id (basin ID, use HYBAS_ID in PMTiles), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
    - Global coverage of level 5 and 6 watershed basins indexed by H3 hexagons at resolution 8
    - Key columns: HYBAS_ID (unique basin identifier in PMTiles), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
