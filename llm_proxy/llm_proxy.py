@@ -1,7 +1,8 @@
 """
 LLM Proxy Server for Kubernetes Deployment
-Securely proxies requests to OpenAI-compatible LLM endpoint
-API key is stored in environment variable, never exposed to browser
+Multi-provider proxy supporting NRP, OpenRouter, and Nimbus endpoints
+Provides unified logging for all LLM requests
+API keys stored in environment variables, never exposed to browser
 Requires authentication token to prevent unauthorized use
 """
 
@@ -10,9 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 import os
+import json
+import time
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
-app = FastAPI(title="LLM Proxy for Wetlands Chatbot")
+app = FastAPI(title="Multi-Provider LLM Proxy for Wetlands Chatbot")
 
 # Enable CORS - allow requests from GitHub Pages and k8s deployment
 app.add_middleware(
@@ -29,25 +33,103 @@ app.add_middleware(
 )
 
 # Get configuration from environment
-def get_llm_endpoint():
-    endpoint = os.getenv("LLM_ENDPOINT")
-    if not endpoint:
-        endpoint = "https://ellm.nrp-nautilus.io/v1"
-    # Always construct endpoint as <base>/chat/completions
-    endpoint = endpoint.rstrip("/")
-    if not endpoint.endswith("/chat/completions"):
-        endpoint = endpoint + "/chat/completions"
-    print(f"LLM_ENDPOINT set to: {endpoint}")
-    return endpoint
-
-LLM_ENDPOINT = get_llm_endpoint()
-LLM_API_KEY = os.getenv("NRP_API_KEY")
+NRP_ENDPOINT = os.getenv("LLM_ENDPOINT", "https://ellm.nrp-nautilus.io/v1")
+NRP_API_KEY = os.getenv("NRP_API_KEY")
+OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
+NIMBUS_API_KEY = os.getenv("NIMBUS_API_KEY")
 PROXY_KEY = os.getenv("PROXY_KEY")  # Key required from clients
 
-if not LLM_API_KEY:
-    print("WARNING: NRP_API_KEY environment variable not set!")
+# Provider endpoints
+PROVIDERS = {
+    "nrp": {
+        "endpoint": NRP_ENDPOINT.rstrip("/") + "/chat/completions",
+        "api_key": NRP_API_KEY,
+        "models": ["kimi", "qwen3", "glm-4.6"]
+    },
+    "openrouter": {
+        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+        "api_key": OPENROUTER_KEY,
+        "models": ["anthropic/", "mistralai/", "amazon/", "openai/", "qwen/"]  # Model prefixes
+    },
+    "nimbus": {
+        "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
+        "api_key": NIMBUS_API_KEY,
+        "models": ["cirrus"]
+    }
+}
+
+# Log configuration status
+print("=" * 60)
+print("🚀 Multi-Provider LLM Proxy Starting")
+print("=" * 60)
+for provider, config in PROVIDERS.items():
+    has_key = bool(config["api_key"])
+    status = "✓" if has_key else "✗"
+    print(f"{status} {provider.upper()}: {config['endpoint']} (key: {'set' if has_key else 'MISSING'})")
 if not PROXY_KEY:
-    print("WARNING: PROXY_KEY environment variable not set!")
+    print("⚠️  WARNING: PROXY_KEY not set - proxy will reject all requests!")
+print("=" * 60)
+
+def get_provider_for_model(model: str) -> tuple[str, dict]:
+    """Determine which provider to use based on model name"""
+    # Check exact matches first (NRP and Nimbus)
+    for provider_name, config in PROVIDERS.items():
+        if model in config["models"]:
+            return provider_name, config
+    
+    # Check prefix matches (OpenRouter)
+    for provider_name, config in PROVIDERS.items():
+        for model_prefix in config["models"]:
+            if model.startswith(model_prefix):
+                return provider_name, config
+    
+    # Default to NRP
+    print(f"⚠️  Unknown model '{model}', defaulting to NRP")
+    return "nrp", PROVIDERS["nrp"]
+
+def log_request(provider: str, model: str, messages: List[Dict], tools_count: int = 0):
+    """Log incoming request in structured JSON format"""
+    log_entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "type": "request",
+        "provider": provider,
+        "model": model,
+        "message_count": len(messages),
+        "tools_count": tools_count,
+        "user_message": messages[-1].get("content", "")[:200] if messages else ""  # Last message preview
+    }
+    print(f"📥 REQUEST: {json.dumps(log_entry)}", flush=True)
+
+def log_response(provider: str, model: str, response_data: dict, latency_ms: int, error: str = None):
+    """Log response in structured JSON format"""
+    log_entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "type": "response",
+        "provider": provider,
+        "model": model,
+        "latency_ms": latency_ms,
+    }
+    
+    if error:
+        log_entry["error"] = error
+    else:
+        # Extract response details
+        if "choices" in response_data and len(response_data["choices"]) > 0:
+            message = response_data["choices"][0].get("message", {})
+            log_entry["has_content"] = bool(message.get("content"))
+            log_entry["has_tool_calls"] = bool(message.get("tool_calls"))
+            log_entry["content_preview"] = (message.get("content") or "")[:200]
+            
+            if message.get("tool_calls"):
+                tool_names = [tc["function"]["name"] for tc in message["tool_calls"]]
+                log_entry["tool_calls"] = tool_names
+        
+        # Extract token usage if available
+        if "usage" in response_data:
+            log_entry["tokens"] = response_data["usage"]
+    
+    status = "✗" if error else "✓"
+    print(f"{status} RESPONSE: {json.dumps(log_entry)}", flush=True)
 
 class ChatRequest(BaseModel):
     messages: List[Dict[str, Any]]  # Accept any message format from OpenAI API
@@ -60,11 +142,13 @@ class ChatRequest(BaseModel):
 @app.post("/chat")  # Keep for backward compatibility
 async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header(None)):
     """
-    Proxy chat requests to LLM endpoint with API key from environment
+    Multi-provider proxy for chat completions
+    Routes requests to appropriate provider based on model name
+    Logs all requests and responses for observability
     Requires client to provide PROXY_KEY via Authorization header
-    API keys: PROXY_KEY (client auth) and NRP_API_KEY (LLM endpoint auth)
-    Supports standard OpenAI-compatible path: /v1/chat/completions
     """
+    start_time = time.time()
+    
     # Check client authorization
     if not PROXY_KEY:
         raise HTTPException(status_code=500, detail="PROXY_KEY not configured on server")
@@ -76,27 +160,33 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
     if not client_key or client_key != PROXY_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid or missing proxy key")
     
-    if not LLM_API_KEY:
-        raise HTTPException(status_code=500, detail="NRP_API_KEY not configured on server")
+    # Determine provider based on model
+    provider_name, provider_config = get_provider_for_model(request.model)
+    endpoint = provider_config["endpoint"]
+    api_key = provider_config["api_key"]
     
-    print(f"Proxying request to: {LLM_ENDPOINT}")
-    print(f"Model: {request.model}")
-    print(f"Messages count: {len(request.messages)}")
-    if request.tools:
-        print(f"Tools provided: {len(request.tools)} tools")
-        # Log tool names for debugging
-        tool_names = [t.get('function', {}).get('name', 'unknown') for t in request.tools]
-        print(f"Tool names: {tool_names}")
+    if not api_key:
+        error_msg = f"{provider_name.upper()} API key not configured on server"
+        log_response(provider_name, request.model, {}, 0, error=error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
     
-    # Prepare request to LLM
+    # Log incoming request
+    log_request(provider_name, request.model, request.messages, len(request.tools or []))
+    
+    # Prepare request to LLM provider
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {LLM_API_KEY}"
+        "Authorization": f"Bearer {api_key}"
     }
+    
+    # Add OpenRouter-specific headers
+    if provider_name == "openrouter":
+        headers["HTTP-Referer"] = "https://wetlands.nrp-nautilus.io"
+        headers["X-Title"] = "Wetlands Chatbot"
     
     payload = {
         "model": request.model,
-        "messages": request.messages,  # Pass through messages as-is
+        "messages": request.messages,
         "temperature": request.temperature
     }
     
@@ -104,52 +194,36 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
     if request.tools:
         payload["tools"] = request.tools
         payload["tool_choice"] = request.tool_choice
-        print(f"Added tools to payload, tool_choice: {request.tool_choice}")
     
-    # Make request to LLM
-    print(f"Sending request to LLM...")
-    import time
-    start_time = time.time()
-    async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minutes to match ingress timeout
+    # Make request to LLM provider
+    async with httpx.AsyncClient(timeout=600.0) as client:
         try:
-            print(f"Calling httpx.post...")
-            response = await client.post(LLM_ENDPOINT, json=payload, headers=headers)
-            elapsed = time.time() - start_time
-            print(f"Got response object: {response.status_code} (took {elapsed:.2f}s)")
-            print(f"Response headers: {dict(response.headers)}")
+            response = await client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()
-            print(f"Status check passed, parsing JSON...")
             result = response.json()
-            print(f"Response parsed successfully, has {len(str(result))} chars")
-            # Log message content for debugging
-            if 'choices' in result and len(result['choices']) > 0:
-                message = result['choices'][0].get('message', {})
-                msg_content = message.get('content')
-                tool_calls = message.get('tool_calls')
-                
-                print(f"🔍 LLM Response message content: {msg_content[:200] if msg_content else 'NULL/EMPTY'}")
-                print(f"🔍 LLM Response message content length: {len(msg_content) if msg_content else 0}")
-                
-                if tool_calls:
-                    print(f"🔧 LLM Response includes tool_calls: {len(tool_calls)} calls")
-                    for i, tc in enumerate(tool_calls):
-                        print(f"🔧   Tool call {i+1}: {tc.get('function', {}).get('name')} - args: {tc.get('function', {}).get('arguments', '')[:100]}")
+            
+            # Log successful response
+            latency_ms = int((time.time() - start_time) * 1000)
+            log_response(provider_name, request.model, result, latency_ms)
+            
             return result
+            
         except httpx.TimeoutException as e:
-            elapsed = time.time() - start_time
-            error_detail = f"LLM request timed out after {elapsed:.2f}s"
-            print(f"ERROR TimeoutException: {error_detail}")
+            latency_ms = int((time.time() - start_time) * 1000)
+            error_detail = f"Request timed out after {latency_ms}ms"
+            log_response(provider_name, request.model, {}, latency_ms, error=error_detail)
             raise HTTPException(status_code=504, detail=error_detail)
+            
         except httpx.HTTPStatusError as e:
-            error_detail = f"LLM API returned {e.response.status_code}: {e.response.text}"
-            print(f"ERROR HTTPStatusError: {error_detail}")
+            latency_ms = int((time.time() - start_time) * 1000)
+            error_detail = f"Provider returned {e.response.status_code}: {e.response.text[:200]}"
+            log_response(provider_name, request.model, {}, latency_ms, error=error_detail)
             raise HTTPException(status_code=500, detail=error_detail)
+            
         except Exception as e:
-            elapsed = time.time() - start_time
-            error_detail = f"LLM request failed after {elapsed:.2f}s: {type(e).__name__}: {str(e)}"
-            print(f"ERROR Exception: {error_detail}")
-            import traceback
-            traceback.print_exc()
+            latency_ms = int((time.time() - start_time) * 1000)
+            error_detail = f"{type(e).__name__}: {str(e)}"
+            log_response(provider_name, request.model, {}, latency_ms, error=error_detail)
             raise HTTPException(status_code=500, detail=error_detail)
 
 @app.post("/llm")
@@ -187,10 +261,14 @@ async def options_chat():
 @app.get("/health")
 async def health_check():
     """Health check endpoint (logging suppressed)"""
+    providers_status = {
+        name: {"configured": bool(config["api_key"]), "endpoint": config["endpoint"]}
+        for name, config in PROVIDERS.items()
+    }
     return {
         "status": "healthy",
-        "llm_endpoint": LLM_ENDPOINT,
-        "api_key_configured": bool(LLM_API_KEY)
+        "providers": providers_status,
+        "proxy_key_configured": bool(PROXY_KEY)
     }
 
 # Configure logging to filter out /health endpoint

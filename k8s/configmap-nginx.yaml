@@ -6,7 +6,7 @@ data:
   config.template.json: |
     {
         "mcp_server_url": "${MCP_SERVER_URL}",
-        "llm_model": "devstral",
+        "llm_model": "anthropic/claude-sonnet-4.5",
         "llm_models": [
             {
                 "value": "glm-4.6",
@@ -17,8 +17,8 @@ data:
             {
                 "value": "cirrus",
                 "label": "cirrus nemotron3-nano",
-                "endpoint": "https://vllm-cirrus.carlboettiger.info/v1",
-                "api_key": "${NIMBUS_API_KEY}"
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
             },
             {
                 "value": "qwen3",
@@ -35,32 +35,32 @@ data:
             {
                 "value": "mistralai/devstral-2512:free",
                 "label": "devstral",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "api_key": "${OPENROUTER_KEY}"
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
             },
             {
                 "value": "amazon/nova-2-lite-v1:free",
                 "label": "nova-2-lite",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "api_key": "${OPENROUTER_KEY}"
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
             },
             {
                 "value": "openai/gpt-oss-120b:free",
                 "label": "gpt-oss-120b",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "api_key": "${OPENROUTER_KEY}"
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
             },
-                        {
+            {
                 "value": "anthropic/claude-sonnet-4.5",
                 "label": "claude",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "api_key": "${OPENROUTER_KEY}"
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
             },
             {
                 "value": "qwen/qwen3-next-80b-a3b-thinking",
                 "label": "qwen3-next-80b",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "api_key": "${OPENROUTER_KEY}"
+                "endpoint": "${LLM_ENDPOINT}",
+                "api_key": "${PROXY_KEY}"
             }
             
         ]

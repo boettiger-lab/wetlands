@@ -5,7 +5,7 @@ metadata:
   labels:
     app: llm-proxy
 spec:
-  replicas: 2
+  replicas: 4
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +22,7 @@ spec:
       containers:
       - name: llm-proxy
         image: astral/uv:python3.12-bookworm-slim
-        command: ["uvx", "--from", "uvicorn", "--with", "fastapi", "--with", "httpx", "--with", "pydantic", "uvicorn", "llm_proxy:app", "--host", "0.0.0.0", "--port", "8002"]
+        command: ["uvx", "--from", "uvicorn", "--with", "fastapi", "--with", "httpx", "--with", "pydantic", "uvicorn", "llm_proxy:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "4"]
         workingDir: /app
         ports:
         - containerPort: 8002
@@ -37,15 +37,25 @@ spec:
             secretKeyRef:
               name: llm-proxy-secrets
               key: proxy-key
+        - name: OPENROUTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openrouter-key
+              key: OPENROUTER_KEY
+        - name: NIMBUS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nimbus-api-key
+              key: NIMBUS_API_KEY
         - name: LLM_ENDPOINT
           value: "https://ellm.nrp-nautilus.io/v1"
         resources:
           requests:
-            cpu: "500m"
-            memory: "512Mi"
-          limits:
             cpu: "1000m"
             memory: "1Gi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
         volumeMounts:
         - name: app-code
           mountPath: /app

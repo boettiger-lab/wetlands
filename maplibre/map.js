@@ -29,7 +29,7 @@ window.MapController = {
         },
         'ramsar': {
             displayName: 'Ramsar Wetland Sites',
-            layerIds: ['ramsar-layer', 'ramsar-outline'],
+            layerIds: ['ramsar-layer'],
             checkboxId: 'ramsar-layer',
             hasLegend: false,
             isVector: true,
@@ -102,8 +102,23 @@ window.MapController = {
                 'NO_TAKE': { type: 'string', description: 'No-take zone status' }
             }
         },
+        'hydrobasins5': {
+            displayName: 'Catchments (HydroBASINS L5)',
+            layerIds: ['hydrobasins5-fill', 'hydrobasins5-layer'],
+            checkboxId: 'hydrobasins5-layer',
+            hasLegend: false,
+            isVector: true,
+            sourceLayer: 'hydrobasins_level_05',
+            filterableProperties: {
+                'HYBAS_ID': { type: 'number', description: 'Unique basin identifier' },
+                'PFAF_ID': { type: 'number', description: 'Pfafstetter hierarchical code' },
+                'UP_AREA': { type: 'number', description: 'Upstream drainage area in km²' },
+                'SUB_AREA': { type: 'number', description: 'Sub-basin area in km²' },
+                'MAIN_BAS': { type: 'number', description: 'Main basin ID' }
+            }
+        },
         'hydrobasins': {
-            displayName: 'Watersheds (HydroBASINS L6)',
+            displayName: 'Sub-catchments (HydroBASINS L6)',
             layerIds: ['hydrobasins-fill', 'hydrobasins-layer'],
             checkboxId: 'hydrobasins-layer',
             hasLegend: false,
@@ -413,6 +428,12 @@ window.MapController = {
             'line-color': '#01579B',
             'line-width': 1.5
         },
+        'hydrobasins5': {
+            'fill-color': 'transparent',
+            'fill-opacity': 0.2,
+            'line-color': '#1565C0',
+            'line-width': 1.5
+        },
         'hydrobasins': {
             'fill-color': 'transparent',
             'fill-opacity': 0.2,
@@ -697,22 +718,6 @@ map.on('load', function () {
             }
         });
 
-        map.addLayer({
-            'id': 'ramsar-outline',
-            'type': 'line',
-            'source': 'ramsar-source',
-            'source-layer': 'ramsar',
-            'minzoom': 0,
-            'maxzoom': 22,
-            'paint': {
-                'line-color': '#8B008B',
-                'line-width': 2
-            },
-            'layout': {
-                'visibility': 'none'
-            }
-        });
-
         // Add click popup for Ramsar sites
         map.on('click', 'ramsar-layer', (e) => {
             const coordinates = e.lngLat;
@@ -789,6 +794,72 @@ map.on('load', function () {
 
         console.log('WDPA layer added successfully');
 
+        // Add HydroBASINS level 5 PMTiles layer
+        map.addSource('hydrobasins5-source', {
+            'type': 'vector',
+            'url': 'pmtiles://https://s3-west.nrp-nautilus.io/public-hydrobasins/level_05/hydrobasins_level_05.pmtiles',
+            'attribution': '<a href="https://www.hydrosheds.org/products/hydrobasins" target="_blank">HydroBASINS</a>'
+        });
+
+        map.addLayer({
+            'id': 'hydrobasins5-fill',
+            'type': 'fill',
+            'source': 'hydrobasins5-source',
+            'source-layer': 'hydrobasins_level_05',
+            'minzoom': 0,
+            'maxzoom': 22,
+            'paint': {
+                'fill-color': '#1E88E5',
+                'fill-opacity': 0.05
+            },
+            'layout': {
+                'visibility': 'none'
+            }
+        });
+
+        map.addLayer({
+            'id': 'hydrobasins5-layer',
+            'type': 'line',
+            'source': 'hydrobasins5-source',
+            'source-layer': 'hydrobasins_level_05',
+            'minzoom': 0,
+            'maxzoom': 22,
+            'paint': {
+                'line-color': '#1E88E5',
+                'line-width': 2,
+                'line-opacity': 0.8
+            },
+            'layout': {
+                'visibility': 'none'
+            }
+        });
+
+        // Add click popup for HydroBASINS level 5
+        map.on('click', 'hydrobasins5-fill', (e) => {
+            const coordinates = e.lngLat;
+            const properties = e.features[0].properties;
+
+            new maplibregl.Popup()
+                .setLngLat(coordinates)
+                .setHTML(`
+                    <strong>Catchment Basin (Level 5)</strong><br>
+                    ${properties.PFAF_ID ? 'Pfafstetter ID: ' + properties.PFAF_ID + '<br>' : ''}
+                    ${properties.UP_AREA ? 'Upstream Area: ' + properties.UP_AREA + ' km²<br>' : ''}
+                    ${properties.SUB_AREA ? 'Sub-basin Area: ' + properties.SUB_AREA + ' km²<br>' : ''}
+                `)
+                .addTo(map);
+        });
+
+        // Change cursor on hover
+        map.on('mouseenter', 'hydrobasins5-fill', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'hydrobasins5-fill', () => {
+            map.getCanvas().style.cursor = '';
+        });
+
+        console.log('HydroBASINS level 5 layer added successfully');
+
         // Add HydroBASINS level 6 PMTiles layer
         map.addSource('hydrobasins-source', {
             'type': 'vector',
@@ -837,7 +908,7 @@ map.on('load', function () {
             new maplibregl.Popup()
                 .setLngLat(coordinates)
                 .setHTML(`
-                    <strong>Watershed Basin</strong><br>
+                    <strong>Sub-catchment Basin (Level 6)</strong><br>
                     ${properties.PFAF_ID ? 'Pfafstetter ID: ' + properties.PFAF_ID + '<br>' : ''}
                     ${properties.UP_AREA ? 'Upstream Area: ' + properties.UP_AREA + ' km²<br>' : ''}
                     ${properties.SUB_AREA ? 'Sub-basin Area: ' + properties.SUB_AREA + ' km²<br>' : ''}
@@ -900,7 +971,6 @@ map.on('load', function () {
             ramsarCheckbox.addEventListener('change', function () {
                 const visibility = this.checked ? 'visible' : 'none';
                 map.setLayoutProperty('ramsar-layer', 'visibility', visibility);
-                map.setLayoutProperty('ramsar-outline', 'visibility', visibility);
             });
         }
 
@@ -913,7 +983,17 @@ map.on('load', function () {
             });
         }
 
-        // Set up HydroBASINS layer toggle
+        // Set up HydroBASINS level 5 layer toggle
+        const hydrobasins5Checkbox = document.getElementById('hydrobasins5-layer');
+        if (hydrobasins5Checkbox) {
+            hydrobasins5Checkbox.addEventListener('change', function () {
+                const visibility = this.checked ? 'visible' : 'none';
+                map.setLayoutProperty('hydrobasins5-fill', 'visibility', visibility);
+                map.setLayoutProperty('hydrobasins5-layer', 'visibility', visibility);
+            });
+        }
+
+        // Set up HydroBASINS level 6 layer toggle
         const hydrobasinsCheckbox = document.getElementById('hydrobasins-layer');
         if (hydrobasinsCheckbox) {
             hydrobasinsCheckbox.addEventListener('change', function () {
@@ -940,10 +1020,12 @@ function switchBaseLayer(styleName) {
         map.getLayoutProperty('carbon-layer', 'visibility') !== 'none' : false;
     const ramsarVisible = map.getLayer('ramsar-layer') ?
         map.getLayoutProperty('ramsar-layer', 'visibility') !== 'none' : false;
-    const ramsarOutlineVisible = ramsarVisible;
     const wdpaVisible = map.getLayer('wdpa-layer') ?
         map.getLayoutProperty('wdpa-layer', 'visibility') !== 'none' : false;
     const wdpaOutlineVisible = wdpaVisible;
+    const hydrobasins5Visible = map.getLayer('hydrobasins5-layer') ?
+        map.getLayoutProperty('hydrobasins5-layer', 'visibility') !== 'none' : false;
+    const hydrobasins5FillVisible = hydrobasins5Visible;
     const hydrobasinsVisible = map.getLayer('hydrobasins-layer') ?
         map.getLayoutProperty('hydrobasins-layer', 'visibility') !== 'none' : false;
     const hydrobasinsFillVisible = hydrobasinsVisible;
@@ -1049,22 +1131,8 @@ function switchBaseLayer(styleName) {
             }
         });
 
-        map.addLayer({
-            'id': 'ramsar-outline',
-            'type': 'line',
-            'source': 'ramsar-source',
-            'source-layer': 'ramsar',
-            'minzoom': 0,
-            'maxzoom': 22,
-            'paint': {
-                'line-color': '#8B008B',
-                'line-width': 2
-            }
-        });
-
         if (!ramsarVisible) {
             map.setLayoutProperty('ramsar-layer', 'visibility', 'none');
-            map.setLayoutProperty('ramsar-outline', 'visibility', 'none');
             document.getElementById('ramsar-layer').checked = false;
         }
 
@@ -1093,7 +1161,47 @@ function switchBaseLayer(styleName) {
             document.getElementById('wdpa-layer').checked = false;
         }
 
-        // Re-add HydroBASINS layer
+        // Re-add HydroBASINS level 5 layer
+        map.addSource('hydrobasins5-source', {
+            'type': 'vector',
+            'url': 'pmtiles://https://s3-west.nrp-nautilus.io/public-hydrobasins/level_05/hydrobasins_level_05.pmtiles',
+            'attribution': '<a href="https://www.hydrosheds.org/products/hydrobasins" target="_blank">HydroBASINS</a>'
+        });
+
+        map.addLayer({
+            'id': 'hydrobasins5-fill',
+            'type': 'fill',
+            'source': 'hydrobasins5-source',
+            'source-layer': 'hydrobasins_level_05',
+            'minzoom': 0,
+            'maxzoom': 22,
+            'paint': {
+                'fill-color': '#1E88E5',
+                'fill-opacity': 0.05
+            }
+        });
+
+        map.addLayer({
+            'id': 'hydrobasins5-layer',
+            'type': 'line',
+            'source': 'hydrobasins5-source',
+            'source-layer': 'hydrobasins_level_05',
+            'minzoom': 0,
+            'maxzoom': 22,
+            'paint': {
+                'line-color': '#1E88E5',
+                'line-width': 2,
+                'line-opacity': 0.8
+            }
+        });
+
+        if (!hydrobasins5Visible) {
+            map.setLayoutProperty('hydrobasins5-fill', 'visibility', 'none');
+            map.setLayoutProperty('hydrobasins5-layer', 'visibility', 'none');
+            document.getElementById('hydrobasins5-layer').checked = false;
+        }
+
+        // Re-add HydroBASINS level 6 layer
         map.addSource('hydrobasins-source', {
             'type': 'vector',
             'url': 'pmtiles://https://s3-west.nrp-nautilus.io/public-hydrobasins/level_06/hydrobasins_level_06.pmtiles',

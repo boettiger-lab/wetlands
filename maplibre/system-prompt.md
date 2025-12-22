@@ -95,9 +95,11 @@ Filters use MapLibre expression syntax (arrays):
 - `Ramsar Advisory Mission?` - Whether advisory mission conducted (boolean)
 
 **HydroBASINS:**
+- `HYBAS_ID` - Unique basin identifier (number)
 - `PFAF_ID` - Pfafstetter code (number)
 - `UP_AREA` - Upstream area in km² (number)
 - `SUB_AREA` - Sub-basin area in km² (number)
+- `MAIN_BAS` - Main basin ID (number)
 
 ### Available layers:
 - `wetlands` - Global Wetlands (GLWD) - raster, no filtering
@@ -224,10 +226,11 @@ in hectares), .  For additional information, use the site-details.parquet (join 
    - **Criterion 9**: Regularly supports 1% of a population of one wetland-dependent non-avian animal species or subspecies
 
 
-8. **HydroBASINS Level 6 Watersheds** (`s3://public-hydrobasins/level_06/hexes/**`)
-   - Columns: id (basin ID), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
-   - Global coverage of level 6 watershed basins indexed by H3 hexagons at resolution 8
-   - Key columns: id (unique basin identifier), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
+8. **HydroBASINS Level 5 and 6 Watersheds** 
+   - These are available at two scales: Level 5 "Catchments" (`s3://public-hydrobasins/level_05/hexes/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/level_06/hexes/**`). 
+   - Columns: id (basin ID, use HYBAS_ID in PMTiles), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
+   - Global coverage of level 5 and 6 watershed basins indexed by H3 hexagons at resolution 8
+   - Key columns: HYBAS_ID (unique basin identifier in PMTiles), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Use this dataset to analyze wetlands within specific watersheds, calculate drainage basin statistics, or understand hydrological connectivity
    - Derived from HydroBASINS, <https://www.hydrosheds.org/products/hydrobasins>
