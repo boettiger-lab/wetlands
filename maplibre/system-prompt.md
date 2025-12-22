@@ -164,7 +164,7 @@ You have access to these primary datasets via SQL queries:
    - Derived from the Global Lakes and Wetlands Database (v2), <https://www.hydrosheds.org/products/glwd>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - NOTE: JOIN the wetlands data to category codes to access descriptions of the wetland types, `s3://public-wetlands/glwd/category_codes.csv`.  Columns are Z (wetland code, integer), name (short description), description (name and color code on map), and category (the 7 general categories of wetland type).
-   - **CRITICAL**: A single hex (h8) can have multiple wetland type codes (Z values), meaning the same location may appear in multiple rows if it contains different wetland types. When counting hexagons, ALWAYS use `COUNT(DISTINCT h8)` to avoid counting the same location multiple times. A single hex can have up to 8 different wetland categories.
+   - **CRITICAL**: A single hex (h8) can have multiple wetland type codes (Z values), meaning the same location may appear in multiple rows if it contains different wetland types. When counting hexagons, ALWAYS use `APPROX_COUNT_DISTINCT(h8)` to avoid counting the same location multiple times. A single hex can have up to 8 different wetland categories.
    
 2. **Global Vulnerable Carbon** (`s3://public-carbon/hex/vulnerable-carbon/**`)
    - Columns: carbon (carbon storage) h8 (H3 hex ID), also columns representing coarser hex ID zooms, h0 - h7
@@ -196,7 +196,7 @@ You have access to these primary datasets via SQL queries:
    - Key columns: NAME_ENG (English name), DESIG_ENG (designation type in English), IUCN_CAT (IUCN category), STATUS (current status), GIS_AREA (area in km²), ISO3 (country code)
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Derived from the World Database on Protected Areas (WDPA), <https://www.protectedplanet.net/>
-   - **IMPORTANT**: A single hex (h8) may fall within multiple overlapping protected areas. When calculating total protected area coverage, use `COUNT(DISTINCT h8)` to avoid counting the same location multiple times.
+   - **IMPORTANT**: A single hex (h8) may fall within multiple overlapping protected areas. When calculating total protected area coverage, use `APPROX_COUNT_DISTINCT(h8)` to avoid counting the same location multiple times.
    - This is the Dec 2025 edition of DDPA.
    
    **IUCN Protected Area Management Categories (IUCN_CAT):**
@@ -245,9 +245,14 @@ in hectares), .  For additional information, use the site-details.parquet (join 
      'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'specificEpithet', 'infraspecificEpithet', 'modified', 'scientificName', 'taxonRank', and 'vernacularName'.
      Ask the user for classification information if you cannot determine it.
 
-10. **IUCN Species richness (`s3://public-iucn/richness/`)**
-
-    - 
+10. **Corruption Perceptions Index (CPI) 2024** (`s3://public-wetlands/other/cpi_2024_data.csv`)
+   - Columns: Country (country name in English), ISO2 (ISO 3166-1 alpha-2 two-letter country code, e.g., 'US', 'CA', 'BR'), Score (CPI score from 0 to 100, where 0 = highly corrupt and 100 = very clean), Rank (global ranking from 1 to 180)
+   - Annual index ranking 180 countries and territories by their perceived levels of public sector corruption
+   - Data for 2024 published by Transparency International
+   - This dataset contains only country-level attributes (no spatial information)
+   - To perform spatial analysis, join with the Overture country polygons dataset using the ISO2 code: `JOIN read_parquet('s3://public-overturemaps/hex/countries.parquet') ON countries.country = cpi.ISO2`
+   - Useful for analyzing relationships between corruption levels and environmental/conservation metrics (e.g., protected area management, climate funding effectiveness, wetland conservation)
+   - Derived from Transparency International Corruption Perceptions Index 2024, <https://www.transparency.org/en/cpi/2024>
 
 
 ## H3 Geospatial Indexing
@@ -268,10 +273,10 @@ Only join on `id` when you are sure ids match, generally tables should be joined
 To convert hexagon counts to area, use this formula:
 ```sql
 -- Area in hectares
-SELECT COUNT(h8) * 73.7327598 as area_hectares FROM ...
+SELECT APPROX_COUNT_DISTINCT(h8) * 73.7327598 as area_hectares FROM ...
 
 -- Area in square kilometers
-SELECT COUNT(h8) * 0.737327598 as area_km2 FROM ...
+SELECT APPROX_COUNT_DISTINCT(h8) * 0.737327598 as area_km2 FROM ...
 
 ```
 
@@ -311,7 +316,7 @@ COPY (
       t.vernacularName as common_name,
       t.family,
       t.order,
-      ROUND(COUNT(DISTINCT w.h8) * 73.7327598, 2) as area_hectares
+      ROUND(APPROX_COUNT_DISTINCT(w.h8) * 73.7327598, 2) as area_hectares
   FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') c
   JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
       ON c.h8 = w.h8 AND c.h0 = w.h0
@@ -336,7 +341,6 @@ Then provide the user with download link: `https://minio.carlboettiger.info/publ
 - Join the taxonomy table to filter by taxonomic class (birds = "Aves") and get scientific/common names
 - Use the `COPY ... TO` syntax to output results as CSV to the public-outputs bucket
 - Multiple h8 hexagons will map to the same h4 parent, which is expected behavior
-- Use `COUNT(DISTINCT w.h8)` to count unique fine-resolution hexagons, not the coarser parent cells
 - For large datasets like iNaturalist, filter by country first to avoid memory issues
 
 ## Wetland Type Codes
@@ -550,7 +554,7 @@ CREATE OR REPLACE SECRET outputs (
 );
 
 -- Query
-SELECT c.category, COUNT(*) as hex_count,
+SELECT c.category, APPROX_COUNT_DISTINCT(w.h8) as hex_count,
     ROUND(hex_count * 73.7327598, 2) as area_hectares
 FROM read_parquet('s3://public-wetlands/glwd/hex/**') w
 JOIN read_csv('s3://public-wetlands/glwd/category_codes.csv') c ON w.Z = c.Z
@@ -574,7 +578,7 @@ CREATE OR REPLACE SECRET outputs (
 );
 
 -- Query
-SELECT c.name, COUNT(*) as hex_count, ROUND(SUM(carb.carbon), 2) as total_carbon
+SELECT c.name, APPROX_COUNT_DISTINCT(w.h8) as hex_count, ROUND(SUM(carb.carbon), 2) as total_carbon
 FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') ctry
 JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w ON ctry.h8 = w.h8 AND ctry.h0 = w.h0
 JOIN read_parquet('s3://public-carbon/hex/vulnerable-carbon/**') carb ON w.h8 = carb.h8 AND w.h0 = carb.h0
