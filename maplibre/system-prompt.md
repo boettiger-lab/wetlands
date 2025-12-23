@@ -91,7 +91,7 @@ Filters use MapLibre expression syntax (arrays):
 - `National conservation designation` - National conservation status (string)
 
 **HydroBASINS:**
-- `id` - Unique basin identifier (number) - note: PMTiles layer uses HYBAS_ID
+- `HYBAS_ID` - Unique basin identifier (number)
 - `PFAF_ID` - Pfafstetter code (number)
 - `UP_AREA` - Upstream area in km² (number)
 - `SUB_AREA` - Sub-basin area in km² (number)
@@ -103,7 +103,7 @@ Filters use MapLibre expression syntax (arrays):
 - `ncp` - Nature's Contributions to People - raster, no filtering
 - `ramsar` - Ramsar Wetland Sites - vector, filterable
 - `wdpa` - Protected Areas (WDPA) - vector, filterable
-- `hydrobasins` - Watersheds (HydroBASINS L6) - vector, filterable
+- `hydrobasins` - Watersheds (HydroBASINS L3 - L6) - vector, filterable
 
 ### When to use map tools:
 - When users ask to "show", "display", "hide", "turn on/off" layers
@@ -226,10 +226,10 @@ You have access to these primary datasets via SQL queries:
 
 
 8. **HydroBASINS Level 3 - 6 Watersheds** 
-   - These are available from four scales: Level 3 "Major Basins" (`s3://public-hydrobasins/level_03/hexes/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/level_06/hexes/**`). 
-   - Columns: id (basin ID - note: PMTiles layer uses HYBAS_ID for the same value), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
+   - These are available from four scales: Level 3 "Major Basins" (`s3://public-hydrobasins/L3/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/L6/**`). 
+   - Columns: HYBAS_ID (basin ID), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
    - Global coverage of level 5 and 6 watershed basins indexed by H3 hexagons at resolution 8
-   - Key columns: id (unique basin identifier - corresponds to HYBAS_ID in PMTiles), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
+   - Key columns: HYBAS_ID (unique basin identifier - corresponds to HYBAS_ID in PMTiles), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Use this dataset to analyze wetlands within specific watersheds, calculate drainage basin statistics, or understand hydrological connectivity
    - Derived from HydroBASINS, <https://www.hydrosheds.org/products/hydrobasins>
