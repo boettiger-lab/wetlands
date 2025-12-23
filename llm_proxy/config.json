@@ -1,0 +1,35 @@
+{
+    "providers": {
+        "nrp": {
+            "endpoint": "https://ellm.nrp-nautilus.io/v1/chat/completions",
+            "api_key_env": "NRP_API_KEY",
+            "models": [
+                "kimi",
+                "qwen3",
+                "glm-4.6"
+            ]
+        },
+        "openrouter": {
+            "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+            "api_key_env": "OPENROUTER_KEY",
+            "models": [
+                "anthropic/",
+                "mistralai/",
+                "amazon/",
+                "openai/",
+                "qwen/"
+            ],
+            "extra_headers": {
+                "HTTP-Referer": "https://wetlands.nrp-nautilus.io",
+                "X-Title": "Wetlands Chatbot"
+            }
+        },
+        "nimbus": {
+            "endpoint": "https://vllm-nimbus.carlboettiger.info/v1/chat/completions",
+            "api_key_env": "NIMBUS_API_KEY",
+            "models": [
+                "cirrus"
+            ]
+        }
+    }
+}

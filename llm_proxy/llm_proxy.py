@@ -15,6 +15,7 @@ import json
 import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pathlib import Path
 
 app = FastAPI(title="Multi-Provider LLM Proxy for Wetlands Chatbot")
 
@@ -33,31 +34,66 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers to prevent preflight failures
 )
 
-# Get configuration from environment
-NRP_ENDPOINT = os.getenv("LLM_ENDPOINT", "https://ellm.nrp-nautilus.io/v1")
-NRP_API_KEY = os.getenv("NRP_API_KEY")
-OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
-NIMBUS_API_KEY = os.getenv("NIMBUS_API_KEY")
+# Load configuration from config.json
+def load_config() -> dict:
+    """Load provider configuration from config.json file"""
+    config_path = Path(__file__).parent / "config.json"
+    
+    # Default configuration if config.json doesn't exist
+    default_config = {
+        "providers": {
+            "nrp": {
+                "endpoint": "https://ellm.nrp-nautilus.io/v1/chat/completions",
+                "api_key_env": "NRP_API_KEY",
+                "models": ["kimi", "qwen3", "glm-4.6"]
+            },
+            "openrouter": {
+                "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+                "api_key_env": "OPENROUTER_KEY",
+                "models": ["anthropic/", "mistralai/", "amazon/", "openai/", "qwen/"],
+                "extra_headers": {
+                    "HTTP-Referer": "https://wetlands.nrp-nautilus.io",
+                    "X-Title": "Wetlands Chatbot"
+                }
+            },
+            "nimbus": {
+                "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
+                "api_key_env": "NIMBUS_API_KEY",
+                "models": ["cirrus"]
+            }
+        }
+    }
+    
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            print(f"✓ Loaded configuration from {config_path}")
+            return config
+        except Exception as e:
+            print(f"⚠️  Error loading {config_path}: {e}")
+            print("   Using default configuration")
+            return default_config
+    else:
+        print(f"ℹ️  No config.json found at {config_path}, using defaults")
+        return default_config
+
+# Load config and build providers
+config = load_config()
 PROXY_KEY = os.getenv("PROXY_KEY")  # Key required from clients
 
-# Provider endpoints
-PROVIDERS = {
-    "nrp": {
-        "endpoint": NRP_ENDPOINT.rstrip("/") + "/chat/completions",
-        "api_key": NRP_API_KEY,
-        "models": ["kimi", "qwen3", "glm-4.6"]
-    },
-    "openrouter": {
-        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
-        "api_key": OPENROUTER_KEY,
-        "models": ["anthropic/", "mistralai/", "amazon/", "openai/", "qwen/"]  # Model prefixes
-    },
-    "nimbus": {
-        "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
-        "api_key": NIMBUS_API_KEY,
-        "models": ["cirrus"]
+# Build PROVIDERS dictionary from config
+PROVIDERS = {}
+for provider_name, provider_config in config["providers"].items():
+    api_key_env = provider_config.get("api_key_env")
+    api_key = os.getenv(api_key_env) if api_key_env else None
+    
+    PROVIDERS[provider_name] = {
+        "endpoint": provider_config["endpoint"],
+        "api_key": api_key,
+        "models": provider_config["models"],
+        "extra_headers": provider_config.get("extra_headers", {})
     }
-}
 
 # Log configuration status
 print("=" * 60)
@@ -180,10 +216,9 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
         "Authorization": f"Bearer {api_key}"
     }
     
-    # Add OpenRouter-specific headers
-    if provider_name == "openrouter":
-        headers["HTTP-Referer"] = "https://wetlands.nrp-nautilus.io"
-        headers["X-Title"] = "Wetlands Chatbot"
+    # Add provider-specific extra headers if configured
+    if "extra_headers" in provider_config and provider_config["extra_headers"]:
+        headers.update(provider_config["extra_headers"])
     
     payload = {
         "model": request.model,
