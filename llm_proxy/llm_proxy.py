@@ -29,7 +29,7 @@ app.add_middleware(
         "https://nature.nrp-nautilus.io",  # K8s deployment
         "http://localhost:8000",  # For local testing
     ],
-    allow_credentials=False,
+    allow_credentials=True,  # Required for Authorization header
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],  # Allow all headers to prevent preflight failures
 )
