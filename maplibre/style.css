@@ -70,6 +70,29 @@ body {
     margin-left: 6px;
 }
 
+.level-dropdown {
+    margin-left: 8px;
+    padding: 2px 4px;
+    font-size: 11px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background: white;
+    cursor: pointer;
+    color: #666;
+    font-weight: 500;
+    min-width: 42px;
+}
+
+.level-dropdown:hover {
+    border-color: #999;
+    background: #f5f5f5;
+}
+
+.level-dropdown:focus {
+    outline: 2px solid #4CAF50;
+    outline-offset: 1px;
+}
+
 #menu input[type="checkbox"] {
     cursor: pointer;
 }

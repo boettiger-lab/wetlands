@@ -43,7 +43,7 @@ Paint expressions for data-driven coloring:
 
 **Useful properties for coloring:**
 - WDPA: `OWN_TYPE` (ownership), `IUCN_CAT` (IUCN category), `GOV_TYPE` (governance), `DESIG_TYPE`
-- Ramsar: `ramsarid` (unique site ID), `Site name` (site name), `iso3`/`Country` (country), `Region` (geographic region), `Wetland Type` (wetland classification), `Criterion1`-`Criterion9` (boolean criteria), `Montreux listed` (conservation status), `Management plan implemented` (management status)
+- Ramsar: `ramsarid` (unique site ID), `Site name` (site name), `Country` (country), `Region` (geographic region), `Wetland Type` (wetland classification), `Criterion1`-`Criterion9` (boolean criteria), `Montreux listed` (conservation status), `Management plan implemented` (management status)
 - HydroBASINS: `SUB_AREA` (basin size), `UP_AREA` (upstream area)
 
 ### MapLibre Filter Syntax
@@ -73,26 +73,22 @@ Filters use MapLibre expression syntax (arrays):
 - `Region` - Geographic region (string)
 - `Country` - Country name (string)
 - `Territory` - Territory name (string)
-- `iso3` - Country code (3-letter)
-- `Designation date` - Date of Ramsar designation (string)
-- `Last publication date` - Last update date (string)
+- `Designation date` - Date of Ramsar designation (date)
+- `Last publication date` - Last update date (date)
 - `Area (ha)` - Area in hectares (number)
-- `Latitude` / `Longitude` - Coordinates (number)
 - `Annotated summary` - Site description (string)
 - `Criterion1` through `Criterion9` - Boolean flags for Ramsar criteria
 - `Wetland Type` - Type of wetland ecosystem (string)
 - `Maximum elevation` / `Minimum elevation` - Elevation range in meters (number)
 - `Montreux listed` - Whether site is on Montreux Record (boolean)
 - `Management plan implemented` - Management plan status (boolean)
-- `Management plan available` - Management plan availability (boolean)
+- `Management plan available` - Management plan availability (string)
 - `Ecosystem services` - Description of ecosystem services (string)
 - `Threats` - Documented threats to site (string)
 - `large administrative region` - Large administrative region (string)
 - `Global international legal designations` - Global legal designations (string)
 - `Regional international legal designations` - Regional legal designations (string)
 - `National conservation designation` - National conservation status (string)
-- `Does the wetland extend onto the territory of one or more other countries?` - Transboundary status (boolean)
-- `Ramsar Advisory Mission?` - Whether advisory mission conducted (boolean)
 
 **HydroBASINS:**
 - `HYBAS_ID` - Unique basin identifier (number)
@@ -107,7 +103,7 @@ Filters use MapLibre expression syntax (arrays):
 - `ncp` - Nature's Contributions to People - raster, no filtering
 - `ramsar` - Ramsar Wetland Sites - vector, filterable
 - `wdpa` - Protected Areas (WDPA) - vector, filterable
-- `hydrobasins` - Watersheds (HydroBASINS L6) - vector, filterable
+- `hydrobasins` - Watersheds (HydroBASINS L3 - L6) - vector, filterable
 
 ### When to use map tools:
 - When users ask to "show", "display", "hide", "turn on/off" layers
@@ -164,7 +160,7 @@ You have access to these primary datasets via SQL queries:
    - Derived from the Global Lakes and Wetlands Database (v2), <https://www.hydrosheds.org/products/glwd>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - NOTE: JOIN the wetlands data to category codes to access descriptions of the wetland types, `s3://public-wetlands/glwd/category_codes.csv`.  Columns are Z (wetland code, integer), name (short description), description (name and color code on map), and category (the 7 general categories of wetland type).
-   - **CRITICAL**: A single hex (h8) can have multiple wetland type codes (Z values), meaning the same location may appear in multiple rows if it contains different wetland types. When counting hexagons, ALWAYS use `COUNT(DISTINCT h8)` to avoid counting the same location multiple times. A single hex can have up to 8 different wetland categories.
+   - **CRITICAL**: A single hex (h8) can have multiple wetland type codes (Z values), meaning the same location may appear in multiple rows if it contains different wetland types. When counting hexagons, ALWAYS use `APPROX_COUNT_DISTINCT(h8)` to avoid counting the same location multiple times. A single hex can have up to 8 different wetland categories.
    
 2. **Global Vulnerable Carbon** (`s3://public-carbon/hex/vulnerable-carbon/**`)
    - Columns: carbon (carbon storage) h8 (H3 hex ID), also columns representing coarser hex ID zooms, h0 - h7
@@ -188,6 +184,7 @@ You have access to these primary datasets via SQL queries:
    - Columns: ncp (a score between 0 and 1 representing greatest contributions to least) h8 (H3 hex ID), h0 hex id. 
    - Derived from "Mapping the planet's critical areas for biodiversity and nature's contributions to people", <https://doi.org/10.1038/s41467-023-43832-9>
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
+   
 
 6. **World Protected Areas Database (WDPA)** (`s3://public-wdpa/hex/**`)
    - Columns: OBJECTID, SITE_ID, SITE_PID, SITE_TYPE, NAME_ENG, NAME, DESIG, DESIG_ENG, DESIG_TYPE, IUCN_CAT, INT_CRIT, REALM, REP_M_AREA, GIS_M_AREA, REP_AREA, GIS_AREA, NO_TAKE, NO_TK_AREA, STATUS, STATUS_YR, GOV_TYPE, GOVSUBTYPE, OWN_TYPE, OWNSUBTYPE, MANG_AUTH, MANG_PLAN, VERIF, METADATAID, PRNT_ISO3, ISO3, SUPP_INFO, CONS_OBJ, INLND_WTRS, OECM_ASMT, SHAPE_bbox, h8 (H3 hex ID), h0 (coarse hex ID)
@@ -195,7 +192,7 @@ You have access to these primary datasets via SQL queries:
    - Key columns: NAME_ENG (English name), DESIG_ENG (designation type in English), IUCN_CAT (IUCN category), STATUS (current status), GIS_AREA (area in km²), ISO3 (country code)
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Derived from the World Database on Protected Areas (WDPA), <https://www.protectedplanet.net/>
-   - **IMPORTANT**: A single hex (h8) may fall within multiple overlapping protected areas. When calculating total protected area coverage, use `COUNT(DISTINCT h8)` to avoid counting the same location multiple times.
+   - **IMPORTANT**: A single hex (h8) may fall within multiple overlapping protected areas. When calculating total protected area coverage, use `APPROX_COUNT_DISTINCT(h8)` to avoid counting the same location multiple times.
    - This is the Dec 2025 edition of DDPA.
    
    **IUCN Protected Area Management Categories (IUCN_CAT):**
@@ -209,8 +206,10 @@ You have access to these primary datasets via SQL queries:
    - **Not Reported/Not Applicable/Not Assigned**: Protected area exists but IUCN category not assigned
 
 7. **Ramsar Sites - Wetlands of International Importance** (`s3://public-wetlands/ramsar/hex/**`)
-in hectares), .  For additional information, use the site-details.parquet (join my ramsarid) mentioned below.
-   - Columns: `h8` (H3 hex ID), `h0` (coarse hex ID, hive partitioned),  `ramsarid`, `Site name`, `Region`, `Country`, `Territory`, `Designation date`, `Last publication date`, `Area (ha)`, `Latitude`, `Longitude`, `Annotated summary`, `Criterion1`-`Criterion9` (boolean flags for each Ramsar criterion), `Wetland Type`, `Maximum elevation`, `Minimum elevation`, `Montreux listed`, `Management plan implemented`, `Management plan available`, `Ecosystem services`, `Threats`, `large administrative region`, `Global international legal designations`, `Regional international legal designations`, `National conservation designation`, `Does the wetland extend onto the territory of one or more other countries?`, `Ramsar Advisory Mission?`
+   - Columns: `ramsarid` (Ramsar site ID), `Site name` (official site name), `Region` (geographic region), `Country` (country name), `Territory` (territory name), `Designation date` (date of designation), `Last publication date` (last update date), `Area (ha)` (area in hectares), `Annotated summary` (site description), `Criterion1` through `Criterion9` (boolean flags for each Ramsar criterion), `Wetland Type` (wetland classification), `Maximum elevation` (max elevation in meters), `Minimum elevation` (min elevation in meters), `Montreux listed` (boolean - on Montreux Record), `Management plan implemented` (boolean), `Management plan available` (string), `Ecosystem services` (description), `Threats` (documented threats), `large administrative region`, `Global international legal designations`, `Regional international legal designations`, `National conservation designation`, `source` (data source), `h9`, `h8`, `h7`, `h6`, `h5`, `h4`, `h3`, `h2`, `h1`, `h0` (H3 hex IDs at multiple resolutions)
+   - Global coverage of Ramsar Convention sites indexed by H3 hexagons at multiple resolutions (h0-h9)
+   - Key columns: `Site name` (site name), `Country` (country), `Area (ha)` (designated area in hectares), `ramsarid` (unique Ramsar identifier)
+   - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Derived from the Ramsar Sites Information Service, <https://rsis.ramsar.org/>
 
 
@@ -226,32 +225,32 @@ in hectares), .  For additional information, use the site-details.parquet (join 
    - **Criterion 9**: Regularly supports 1% of a population of one wetland-dependent non-avian animal species or subspecies
 
 
-8. **HydroBASINS Level 5 and 6 Watersheds** 
-   - These are available at two scales: Level 5 "Catchments" (`s3://public-hydrobasins/level_05/hexes/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/level_06/hexes/**`). 
-   - Columns: id (basin ID, use HYBAS_ID in PMTiles), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
+8. **HydroBASINS Level 3 - 6 Watersheds** 
+   - These are available from four scales: Level 3 "Major Basins" (`s3://public-hydrobasins/L3/**`), and level 6 "Sub-catchments" (`s3://public-hydrobasins/L6/**`). 
+   - Columns: HYBAS_ID (basin ID), PFAF_ID (Pfafstetter code), UP_AREA (upstream drainage area in km²), SUB_AREA (sub-basin area in km²), MAIN_BAS (main basin ID), h8 (H3 hex ID), h0 (coarse hex ID)
    - Global coverage of level 5 and 6 watershed basins indexed by H3 hexagons at resolution 8
-   - Key columns: HYBAS_ID (unique basin identifier in PMTiles), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
+   - Key columns: HYBAS_ID (unique basin identifier - corresponds to HYBAS_ID in PMTiles), PFAF_ID (hierarchical Pfafstetter coding system), UP_AREA (total upstream drainage area), SUB_AREA (area of the sub-basin itself)
    - This data is hive-partitioned by h0 hex-id, which may facilitate joins.
    - Use this dataset to analyze wetlands within specific watersheds, calculate drainage basin statistics, or understand hydrological connectivity
    - Derived from HydroBASINS, <https://www.hydrosheds.org/products/hydrobasins>
 
-9. **Species range maps from iNaturalist** (`s3://public-inat/range-maps/hex/**`)
-   - Columns are  taxon_id, parent_taxon_id, name, rank, and hexagon indices h0 to h4.
+9. **Individual Species range maps from iNaturalist** (`s3://public-inat/range-maps/hex/**`)
+   - These maps should mostly be used for questions that involve specific species or species groups that cannot be answered with the IUCN data.
+   - Columns: taxon_id (taxon ID), parent_taxon_id (parent taxon ID), name (taxon name), rank (taxonomic rank), iconic_taxon_id (iconic taxon ID), iconic_taxon_name (iconic taxon name), and hexagon indices h0, h1, h2, h3, h4.
    - Use the taxonomy table `s3://public-inat/taxonomy/taxa_and_common.parquet` to identify specific species (e.g. Coyotes, `scientificName = Canis latrans`),
      or to identify species groups (Mammals, `class = "Mammalia"`). Some species can be identified by common name (vernacularName).  
      Note that `id` column in the taxonmy table corresponds to `taxon_id` in the position tables. Other columns include:
      'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'specificEpithet', 'infraspecificEpithet', 'modified', 'scientificName', 'taxonRank', and 'vernacularName'.
      Ask the user for classification information if you cannot determine it.
 
-
-You have access to a few additional datasets that are specific to the United States
-
-1. **USA Species Richness** (`https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`)
-   - Columns: richness (species count), h8 (H3 hex ID)
-   - This data is continental US only!
-   - Covers some 2000 threatened and endagered species, not all species.
-   - Derived from the NatureServe Map of Biodiversity Importance (MOBI)
-   - **NOTE** You can get individual rangemaps for over 100,000 sepcies anywhere on earth using the iNaturalist Range Maps.  You can combine range maps to estimate overall species richness or richness of specific species groups (i.e. Mammals).   See examples.  
+10. **Corruption Perceptions Index (CPI) 2024** (`s3://public-wetlands/other/cpi_2024_data.csv`)
+   - Columns: Country (country name in English), ISO2 (ISO 3166-1 alpha-2 two-letter country code, e.g., 'US', 'CA', 'BR'), Score (CPI score from 0 to 100, where 0 = highly corrupt and 100 = very clean), Rank (global ranking from 1 to 180)
+   - Annual index ranking 180 countries and territories by their perceived levels of public sector corruption
+   - Data for 2024 published by Transparency International
+   - This dataset contains only country-level attributes (no spatial information)
+   - To perform spatial analysis, join with the Overture country polygons dataset using the ISO2 code: `JOIN read_parquet('s3://public-overturemaps/hex/countries.parquet') ON countries.country = cpi.ISO2`
+   - Useful for analyzing relationships between corruption levels and environmental/conservation metrics (e.g., protected area management, climate funding effectiveness, wetland conservation)
+   - Derived from Transparency International Corruption Perceptions Index 2024, <https://www.transparency.org/en/cpi/2024>
 
 
 ## H3 Geospatial Indexing
@@ -272,10 +271,10 @@ Only join on `id` when you are sure ids match, generally tables should be joined
 To convert hexagon counts to area, use this formula:
 ```sql
 -- Area in hectares
-SELECT COUNT(h8) * 73.7327598 as area_hectares FROM ...
+SELECT APPROX_COUNT_DISTINCT(h8) * 73.7327598 as area_hectares FROM ...
 
 -- Area in square kilometers
-SELECT COUNT(h8) * 0.737327598 as area_km2 FROM ...
+SELECT APPROX_COUNT_DISTINCT(h8) * 0.737327598 as area_km2 FROM ...
 
 ```
 
@@ -315,7 +314,7 @@ COPY (
       t.vernacularName as common_name,
       t.family,
       t.order,
-      ROUND(COUNT(DISTINCT w.h8) * 73.7327598, 2) as area_hectares
+      ROUND(APPROX_COUNT_DISTINCT(w.h8) * 73.7327598, 2) as area_hectares
   FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') c
   JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w 
       ON c.h8 = w.h8 AND c.h0 = w.h0
@@ -340,7 +339,6 @@ Then provide the user with download link: `https://minio.carlboettiger.info/publ
 - Join the taxonomy table to filter by taxonomic class (birds = "Aves") and get scientific/common names
 - Use the `COPY ... TO` syntax to output results as CSV to the public-outputs bucket
 - Multiple h8 hexagons will map to the same h4 parent, which is expected behavior
-- Use `COUNT(DISTINCT w.h8)` to count unique fine-resolution hexagons, not the coarser parent cells
 - For large datasets like iNaturalist, filter by country first to avoid memory issues
 
 ## Wetland Type Codes
@@ -554,7 +552,7 @@ CREATE OR REPLACE SECRET outputs (
 );
 
 -- Query
-SELECT c.category, COUNT(*) as hex_count,
+SELECT c.category, APPROX_COUNT_DISTINCT(w.h8) as hex_count,
     ROUND(hex_count * 73.7327598, 2) as area_hectares
 FROM read_parquet('s3://public-wetlands/glwd/hex/**') w
 JOIN read_csv('s3://public-wetlands/glwd/category_codes.csv') c ON w.Z = c.Z
@@ -578,7 +576,7 @@ CREATE OR REPLACE SECRET outputs (
 );
 
 -- Query
-SELECT c.name, COUNT(*) as hex_count, ROUND(SUM(carb.carbon), 2) as total_carbon
+SELECT c.name, APPROX_COUNT_DISTINCT(w.h8) as hex_count, ROUND(SUM(carb.carbon), 2) as total_carbon
 FROM read_parquet('s3://public-overturemaps/hex/countries.parquet') ctry
 JOIN read_parquet('s3://public-wetlands/glwd/hex/**') w ON ctry.h8 = w.h8 AND ctry.h0 = w.h0
 JOIN read_parquet('s3://public-carbon/hex/vulnerable-carbon/**') carb ON w.h8 = carb.h8 AND w.h0 = carb.h0
