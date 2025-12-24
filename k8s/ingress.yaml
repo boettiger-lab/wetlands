@@ -24,11 +24,12 @@ metadata:
     # Cache preflight responses for 1 hour
     haproxy.org/cors-max-age: "3600"
     
-    # Standard timeouts for static content
-    haproxy.org/timeout-http-request: "60s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/timeout-client: "60s"
-    haproxy.org/timeout-connect: "10s"
+    # Increase timeouts to support long-running LLM requests (10 minutes)
+    # The chatbot makes proxy requests to LLM endpoints that can take several minutes
+    haproxy.org/timeout-http-request: "600s"
+    haproxy.org/timeout-server: "600s"
+    haproxy.org/timeout-client: "600s"
+    haproxy.org/timeout-connect: "30s"
 
 spec:
   ingressClassName: haproxy

@@ -19,6 +19,18 @@ spec:
       labels:
         app: llm-proxy
     spec:
+      initContainers:
+      - name: git-sync
+        image: alpine/git:latest
+        command:
+        - sh
+        - -c
+        - |
+          git clone https://github.com/boettiger-lab/wetlands.git /tmp/repo
+          cp -r /tmp/repo/llm_proxy/* /app/
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
       containers:
       - name: llm-proxy
         image: astral/uv:python3.12-bookworm-slim
@@ -90,5 +102,4 @@ spec:
         effect: "NoSchedule"
       volumes:
       - name: app-code
-        configMap:
-          name: llm-proxy-code
+        emptyDir: {}

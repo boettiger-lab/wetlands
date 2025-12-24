@@ -15,6 +15,7 @@ import json
 import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pathlib import Path
 
 app = FastAPI(title="Multi-Provider LLM Proxy for Wetlands Chatbot")
 
@@ -25,38 +26,74 @@ app.add_middleware(
         "https://cboettig.github.io",
         "https://boettiger-lab.github.io",
         "https://wetlands.nrp-nautilus.io",  # K8s deployment
+        "https://nature.nrp-nautilus.io",  # K8s deployment
         "http://localhost:8000",  # For local testing
     ],
-    allow_credentials=False,
+    allow_credentials=True,  # Required for Authorization header
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],  # Allow all headers to prevent preflight failures
 )
 
-# Get configuration from environment
-NRP_ENDPOINT = os.getenv("LLM_ENDPOINT", "https://ellm.nrp-nautilus.io/v1")
-NRP_API_KEY = os.getenv("NRP_API_KEY")
-OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
-NIMBUS_API_KEY = os.getenv("NIMBUS_API_KEY")
+# Load configuration from config.json
+def load_config() -> dict:
+    """Load provider configuration from config.json file"""
+    config_path = Path(__file__).parent / "config.json"
+    
+    # Default configuration if config.json doesn't exist
+    default_config = {
+        "providers": {
+            "nrp": {
+                "endpoint": "https://ellm.nrp-nautilus.io/v1/chat/completions",
+                "api_key_env": "NRP_API_KEY",
+                "models": ["kimi", "qwen3", "glm-4.6"]
+            },
+            "openrouter": {
+                "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+                "api_key_env": "OPENROUTER_KEY",
+                "models": ["anthropic/", "mistralai/", "amazon/", "openai/", "qwen/"],
+                "extra_headers": {
+                    "HTTP-Referer": "https://wetlands.nrp-nautilus.io",
+                    "X-Title": "Wetlands Chatbot"
+                }
+            },
+            "nimbus": {
+                "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
+                "api_key_env": "NIMBUS_API_KEY",
+                "models": ["cirrus"]
+            }
+        }
+    }
+    
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            print(f"✓ Loaded configuration from {config_path}")
+            return config
+        except Exception as e:
+            print(f"⚠️  Error loading {config_path}: {e}")
+            print("   Using default configuration")
+            return default_config
+    else:
+        print(f"ℹ️  No config.json found at {config_path}, using defaults")
+        return default_config
+
+# Load config and build providers
+config = load_config()
 PROXY_KEY = os.getenv("PROXY_KEY")  # Key required from clients
 
-# Provider endpoints
-PROVIDERS = {
-    "nrp": {
-        "endpoint": NRP_ENDPOINT.rstrip("/") + "/chat/completions",
-        "api_key": NRP_API_KEY,
-        "models": ["kimi", "qwen3", "glm-4.6"]
-    },
-    "openrouter": {
-        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
-        "api_key": OPENROUTER_KEY,
-        "models": ["anthropic/", "mistralai/", "amazon/", "openai/", "qwen/"]  # Model prefixes
-    },
-    "nimbus": {
-        "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
-        "api_key": NIMBUS_API_KEY,
-        "models": ["cirrus"]
+# Build PROVIDERS dictionary from config
+PROVIDERS = {}
+for provider_name, provider_config in config["providers"].items():
+    api_key_env = provider_config.get("api_key_env")
+    api_key = os.getenv(api_key_env) if api_key_env else None
+    
+    PROVIDERS[provider_name] = {
+        "endpoint": provider_config["endpoint"],
+        "api_key": api_key,
+        "models": provider_config["models"],
+        "extra_headers": provider_config.get("extra_headers", {})
     }
-}
 
 # Log configuration status
 print("=" * 60)
@@ -179,10 +216,9 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
         "Authorization": f"Bearer {api_key}"
     }
     
-    # Add OpenRouter-specific headers
-    if provider_name == "openrouter":
-        headers["HTTP-Referer"] = "https://wetlands.nrp-nautilus.io"
-        headers["X-Title"] = "Wetlands Chatbot"
+    # Add provider-specific extra headers if configured
+    if "extra_headers" in provider_config and provider_config["extra_headers"]:
+        headers.update(provider_config["extra_headers"])
     
     payload = {
         "model": request.model,
@@ -236,36 +272,10 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
             # 500 should only be for internal proxy errors
             raise HTTPException(status_code=502, detail=f"Connection error: {error_detail}")
 
-@app.post("/llm")
-async def proxy_llm(request: Request):
-    """Generic LLM endpoint proxy"""
-    body = await request.body()
-    headers = dict(request.headers)
-    # Remove host header to avoid issues
-    headers.pop("host", None)
-    # Add API key
-    headers["Authorization"] = f"Bearer {LLM_API_KEY}"
-    
-    async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minutes to match ingress timeout
-        try:
-            resp = await client.post(LLM_ENDPOINT, content=body, headers=headers)
-            return Response(
-                content=resp.content, 
-                status_code=resp.status_code, 
-                media_type=resp.headers.get("content-type", "application/json")
-            )
-        except Exception as e:
-            print(f"ERROR in /llm endpoint: {type(e).__name__}: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
-
-@app.options("/llm")
-async def options_llm():
-    """Handle CORS preflight for /llm endpoint"""
-    return Response(status_code=204)
-
+@app.options("/v1/chat/completions")
 @app.options("/chat")
 async def options_chat():
-    """Handle CORS preflight for /chat endpoint"""
+    """Handle CORS preflight for chat endpoints"""
     return Response(status_code=204)
 
 @app.get("/health")
@@ -296,11 +306,13 @@ logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 async def root():
     """Root endpoint"""
     return {
-        "service": "LLM Proxy for Wetlands Chatbot",
+        "service": "Multi-Provider LLM Proxy for Wetlands Chatbot",
+        "version": "2.0",
+        "providers": list(PROVIDERS.keys()),
         "endpoints": {
-            "/chat": "POST - Main chat endpoint with structured request",
-            "/llm": "POST - Generic LLM proxy endpoint",
-            "/health": "GET - Health check"
+            "/v1/chat/completions": "POST - OpenAI-compatible chat completions",
+            "/chat": "POST - Legacy chat endpoint",
+            "/health": "GET - Health check with provider status"
         }
     }
 

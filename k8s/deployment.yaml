@@ -50,23 +50,11 @@ spec:
           value: "https://biodiversity-mcp.nrp-nautilus.io/sse"
         - name: LLM_ENDPOINT
           value: "https://llm-proxy.nrp-nautilus.io/v1"
-        - name: DEFAULT_LLM_MODEL
-          value: "kimi"
         - name: PROXY_KEY
           valueFrom:
             secretKeyRef:
               name: llm-proxy-secrets
               key: proxy-key
-        - name: NIMBUS_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: nimbus-api-key
-              key: NIMBUS_API_KEY
-        - name: OPENROUTER_KEY
-          valueFrom:
-            secretKeyRef:
-              name: openrouter-key
-              key: OPENROUTER_KEY
         command:
         - sh
         - -c

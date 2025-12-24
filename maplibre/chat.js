@@ -984,9 +984,12 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
 
                 console.log('[LLM] Using API key from model config');
 
-                // Create AbortController with 5-minute timeout for all models
+                // Create AbortController with 10-minute timeout for all models
                 const abortController = new AbortController();
-                const timeoutId = setTimeout(() => abortController.abort(), 300000); // 5 minute timeout
+                const timeoutId = setTimeout(() => {
+                    console.error('[LLM] Client-side timeout after 10 minutes');
+                    abortController.abort();
+                }, 600000); // 10 minute timeout
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -1224,8 +1227,25 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
 
         } catch (error) {
             console.error('[LLM] Error in queryLLM:', error);
+
+            // Provide user-friendly error messages
+            let errorMessage = error.message;
+
+            // Check for timeout/network errors
+            if (error.name === 'AbortError' || errorMessage.includes('aborted')) {
+                errorMessage = 'Request timed out. The query may be too complex or the server is overloaded. Try a simpler question or try again in a moment.';
+            } else if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch') || errorMessage.includes('network')) {
+                errorMessage = 'Network connection lost. This may be due to:\n\n' +
+                    '• Server timeout (query took too long)\n' +
+                    '• Network connectivity issues\n' +
+                    '• Proxy/gateway timeout\n\n' +
+                    'Try a simpler question or refresh the page.';
+            } else if (errorMessage.includes('Failed to fetch')) {
+                errorMessage = 'Could not reach the server. Please check your internet connection and try again.';
+            }
+
             return {
-                response: `Error: ${error.message}`,
+                response: `Error: ${errorMessage}`,
                 sqlQueries: this.currentTurnQueries
             };
         }

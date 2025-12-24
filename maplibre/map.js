@@ -527,6 +527,16 @@ window.MapController = {
                         (isLineProperty && layerType === 'line')) {
                         window.map.setPaintProperty(layerId, property, value);
                         console.log(`[MapController] Paint property '${property}' set on layer '${layerId}':`, value);
+                        
+                        // When setting fill-color, also increase opacity to make colors visible
+                        // (default opacity is very low for hydrobasins layer)
+                        if (property === 'fill-color' && layerType === 'fill') {
+                            const currentOpacity = window.map.getPaintProperty(layerId, 'fill-opacity');
+                            if (currentOpacity < 0.5) {
+                                window.map.setPaintProperty(layerId, 'fill-opacity', 0.6);
+                                console.log(`[MapController] Increased fill-opacity to 0.6 for visibility`);
+                            }
+                        }
                     }
                 }
             }

@@ -40,6 +40,45 @@ This directory contains the Kubernetes deployment configuration for the hosted L
 - `ingress.yaml` - Kubernetes Ingress with CORS configuration
 - `secrets.yaml.example` - Example secrets configuration (DO NOT commit actual secrets!)
 
+## Configuration
+
+### config.json
+
+The LLM proxy now supports dynamic configuration via `config.json`. This file specifies:
+- API endpoints for each provider
+- Model names/prefixes supported by each provider
+- Environment variable names for API keys (not the secrets themselves)
+- Optional extra headers for specific providers
+
+Example `config.json`:
+```json
+{
+  "providers": {
+    "nrp": {
+      "endpoint": "https://ellm.nrp-nautilus.io/v1/chat/completions",
+      "api_key_env": "NRP_API_KEY",
+      "models": ["kimi", "qwen3", "glm-4.6"]
+    },
+    "openrouter": {
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "api_key_env": "OPENROUTER_KEY",
+      "models": ["anthropic/", "mistralai/", "amazon/", "openai/", "qwen/"],
+      "extra_headers": {
+        "HTTP-Referer": "https://wetlands.nrp-nautilus.io",
+        "X-Title": "Wetlands Chatbot"
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+- `api_key_env`: Name of the environment variable containing the API key
+- `models`: Exact model names or prefixes (for OpenRouter-style routing)
+- `extra_headers`: Optional provider-specific headers
+- If `config.json` is not found, the proxy uses built-in defaults
+- API keys are **never** stored in config.json - they come from environment variables
+
 ## Prerequisites
 
 1. Kubernetes cluster access

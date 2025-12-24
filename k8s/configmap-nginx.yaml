@@ -15,8 +15,8 @@ data:
                 "api_key": "${PROXY_KEY}"
             },
             {
-                "value": "cirrus",
-                "label": "cirrus nemotron3-nano",
+                "value": "nemotron",
+                "label": "spark nemotron3-nano",
                 "endpoint": "${LLM_ENDPOINT}",
                 "api_key": "${PROXY_KEY}"
             },
