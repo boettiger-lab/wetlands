@@ -6,7 +6,7 @@ data:
   config.template.json: |
     {
         "mcp_server_url": "${MCP_SERVER_URL}",
-        "llm_model": "anthropic/claude-sonnet-4.5",
+        "llm_model": "openai/gpt-oss-120b:free",
         "llm_models": [
             {
                 "value": "glm-4.6",
@@ -15,8 +15,8 @@ data:
                 "api_key": "${PROXY_KEY}"
             },
             {
-                "value": "nemotron",
-                "label": "spark nemotron3-nano",
+                "value": "nvidia/nemotron-3-nano-30b-a3b:free",
+                "label": "nemotron3-nano",
                 "endpoint": "${LLM_ENDPOINT}",
                 "api_key": "${PROXY_KEY}"
             },
@@ -86,11 +86,17 @@ data:
         
         # Serve static files - NO caching for dev environment
         location / {
-            try_files $uri $uri/ /index.html;
+            try_files $uri $uri/ =404;
             # Disable all caching for development
             add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
             add_header Pragma "no-cache" always;
             add_header Expires "0" always;
+        }
+        
+        # Fallback to index.html only for HTML navigation (SPA routing)
+        location = / {
+            try_files /index.html =404;
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
         }
 
         # Health check endpoint

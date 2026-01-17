@@ -34,11 +34,15 @@ This directory contains the Kubernetes deployment configuration for the hosted L
 ## Files
 
 - `llm_proxy.py` - FastAPI application that proxies LLM requests (also in configmap.yaml)
+- `analyze_logs.py` - Script to analyze LLM usage patterns from logs
 - `configmap.yaml` - ConfigMap containing the application code
 - `deployment.yaml` - Kubernetes Deployment configuration
 - `service.yaml` - Kubernetes Service configuration
 - `ingress.yaml` - Kubernetes Ingress with CORS configuration
 - `secrets.yaml.example` - Example secrets configuration (DO NOT commit actual secrets!)
+- `cronjob-log-backup.yaml` - CronJob for automatic daily log backups to S3
+- `cronjob-log-backup-rbac.yaml` - RBAC permissions for log backup job
+- `cronjob-log-backup-README.md` - Detailed documentation for log backup system
 
 ## Configuration
 
@@ -118,16 +122,21 @@ rules:
 ### 3. Deploy to Kubernetes
 
 ```bash
+# Apply RBAC for log backup (only needed once)
+kubectl apply -f llm_proxy/cronjob-log-backup-rbac.yaml
+
 # Apply all configurations
 kubectl apply -f llm_proxy/configmap.yaml
 kubectl apply -f llm_proxy/deployment.yaml
 kubectl apply -f llm_proxy/service.yaml
 kubectl apply -f llm_proxy/ingress.yaml
+kubectl apply -f llm_proxy/cronjob-log-backup.yaml
 
 # Check deployment status
 kubectl get pods -l app=llm-proxy
 kubectl get svc llm-proxy
 kubectl get ingress llm-proxy-ingress
+kubectl get cronjob -n biodiversity llm-proxy-log-backup
 ```
 
 ### 4. Verify Deployment
@@ -248,6 +257,41 @@ The deployment includes:
 - **Liveness probe**: Checks `/health` endpoint every 30 seconds
 - **Readiness probe**: Checks `/health` endpoint every 10 seconds
 - **Resource limits**: CPU and memory limits to prevent resource exhaustion
+
+## Log Analysis
+
+The `analyze_logs.py` script provides comprehensive analysis of LLM proxy usage patterns, including:
+
+- **Temporal patterns**: Total calls, busiest days, sampling period, and daily breakdowns
+- **Model distribution**: Usage statistics across different LLM models
+- **Performance metrics**: Latency statistics and response times
+- **Cost tracking**: Total costs and per-request averages (provided by OpenRouter's API)
+- **Tool usage**: Distribution of tool calls made during conversations
+
+**Note**: Cost data comes directly from OpenRouter's API response and accounts for the different pricing of each model.
+
+### Snapshot logs from Kubernetes:
+
+```bash
+# Capture logs from all running pods into timestamped files
+timestamp=$(date +%Y%m%d_%H%M%S)
+for pod in $(kubectl get pods -l app=llm-proxy -o name); do
+  kubectl logs $pod > logs/llm-proxy-$(basename $pod)_${timestamp}.log
+done
+
+# Unify into a single log file
+cat logs/llm-proxy-*_${timestamp}.log > logs/llm-proxy-unified_${timestamp}.log
+```
+
+### Run the analyzer:
+
+```bash
+# Analyze the most recent unified log
+python llm_proxy/analyze_logs.py
+
+# Or specify a specific log file
+python llm_proxy/analyze_logs.py logs/llm-proxy-unified_20260107_190859.log
+```
 
 ## Updating
 

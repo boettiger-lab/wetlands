@@ -393,6 +393,15 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
         }
     }
 
+    getWelcomeMessage() {
+        return 'Hi! I can help you explore global wetlands data and control the map. Try asking:\n\n' +
+            '* "Tell me about the datasets you access and how you work."\n' +
+            '* "Calculate vulnerable carbon stored in different wetlands of India?"\n' +
+            '* "Show Ramsar sites to those meeting Criterion 9; explain the criterion"\n' +
+            '* "Color Ramsar sites by the number of criteria they meet"\n' +
+            '* "Rank the top 10 level-3 hydrobasins by wetland extent, carbon, and NCP, normalized. Explain methodology and show them on map."\n';
+    }
+
     initializeUI() {
         // Configure marked to use highlight.js
         if (window.marked && window.hljs) {
@@ -405,6 +414,12 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
             });
         }
 
+        // Clear any existing chat container to ensure fresh start on page load
+        const existingContainer = document.getElementById('chat-container');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+
         // Chat container
         const container = document.createElement('div');
         container.id = 'chat-container';
@@ -415,8 +430,10 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
         ).join('') || '<option value="kimi">Kimi</option>';
 
         container.innerHTML = `
+            <div id="chat-resize-handle"></div>
             <div id="chat-header">
                 <h3>🦆 Wetlands Data Assistant</h3>
+                <button id="chat-clear" title="Clear chat history" style="background: transparent; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px;">🔄</button>
                 <button id="chat-toggle">−</button>
             </div>
             <div id="chat-messages"></div>
@@ -432,11 +449,15 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
         `;
         document.body.appendChild(container);
 
+        // Setup resize handle
+        this.setupResizeHandle(container);
+
         // Set initial model value
         document.getElementById('model-selector').value = this.selectedModel;
 
         // Event listeners
         document.getElementById('chat-toggle').addEventListener('click', () => this.toggleChat());
+        document.getElementById('chat-clear').addEventListener('click', () => this.clearChat());
         document.getElementById('chat-send').addEventListener('click', () => this.sendMessage());
         document.getElementById('chat-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) this.sendMessage();
@@ -447,14 +468,45 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
         });
 
         // Welcome message
-        this.addMessage(
-            'assistant',
-            'Hi! I can help you explore global wetlands data and control the map. Try asking:\n\n' +
-            '* "Calculate vulnerable carbon stored in different wetlands of India?"\n' +
-            '* "Show state-owned protected areas colored by IUCN category"\n' +
-            '* "Compute carbon stored in each hydrobasin in Spain as a csv"\n' +
-            '* "Filter Ramsar sites to those meeting Criterion 1 and 2."'
-        );
+        this.addMessage('assistant', this.getWelcomeMessage());
+    }
+
+    setupResizeHandle(container) {
+        const resizeHandle = document.getElementById('chat-resize-handle');
+        let isResizing = false;
+        let startX, startY, startWidth, startHeight;
+
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startWidth = parseInt(window.getComputedStyle(container).width, 10);
+            startHeight = parseInt(window.getComputedStyle(container).height, 10);
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            // Calculate new dimensions (resize from top-left corner)
+            const deltaX = startX - e.clientX;
+            const deltaY = startY - e.clientY;
+
+            const newWidth = startWidth + deltaX;
+            const newHeight = startHeight + deltaY;
+
+            // Apply constraints
+            if (newWidth >= 300 && newWidth <= 1600) {
+                container.style.width = newWidth + 'px';
+            }
+            if (newHeight >= 300 && newHeight <= 1200) {
+                container.style.height = newHeight + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
+        });
     }
 
     toggleChat() {
@@ -462,6 +514,38 @@ Example: "State-owned areas are <span style="background-color: #1f77b4; padding:
         const toggle = document.getElementById('chat-toggle');
         container.classList.toggle('collapsed');
         toggle.textContent = container.classList.contains('collapsed') ? '+' : '−';
+    }
+
+    clearChat() {
+        // Clear message history
+        this.messages = [];
+        this.currentTurnQueries = [];
+
+        // Clear DOM
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.innerHTML = '';
+
+        // Reset map state if MapController is available
+        if (window.MapController) {
+            console.log('🗺️ Resetting map state...');
+
+            // Clear filters on all vector layers
+            ['wdpa', 'ramsar', 'hydrobasins'].forEach(layer => {
+                window.MapController.clearLayerFilter(layer);
+            });
+
+            // Reset paint properties on all vector layers
+            ['wdpa', 'ramsar', 'hydrobasins'].forEach(layer => {
+                window.MapController.resetLayerPaint(layer);
+            });
+
+            console.log('✓ Map state reset');
+        }
+
+        // Show welcome message again
+        this.addMessage('assistant', this.getWelcomeMessage());
+
+        console.log('✓ Chat history cleared');
     }
 
     addMessage(role, content, metadata = {}) {

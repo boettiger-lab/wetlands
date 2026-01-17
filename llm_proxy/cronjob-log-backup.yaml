@@ -1,0 +1,168 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: llm-proxy-log-backup
+  namespace: biodiversity
+spec:
+  # Run daily at 2 AM UTC
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: log-backup
+          restartPolicy: OnFailure
+          containers:
+          - name: log-backup
+            image: alpine:latest
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "200m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+            env:
+            - name: TIMESTAMP
+              value: "$(date +%Y%m%d_%H%M%S)"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "🔄 Starting log backup at $(date)"
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              LOG_DIR=/tmp/logs
+              mkdir -p $LOG_DIR
+              
+              # Install kubectl and rclone
+              echo "📦 Installing dependencies..."
+              apk add --no-cache curl rclone
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+              
+              # Get all llm-proxy pod names
+              echo "🔍 Finding llm-proxy pods..."
+              PODS=$(kubectl get pods -n biodiversity -l app=llm-proxy -o name)
+              
+              if [ -z "$PODS" ]; then
+                echo "⚠️  No llm-proxy pods found"
+                exit 0
+              fi
+              
+              # Fetch logs from each pod
+              echo "📥 Fetching logs from pods..."
+              for pod in $PODS; do
+                POD_NAME=$(basename $pod)
+                echo "  - Fetching logs from $POD_NAME"
+                kubectl logs -n biodiversity $pod > $LOG_DIR/${POD_NAME}_${TIMESTAMP}.log 2>&1 || true
+              done
+              
+              # Combine all logs into a unified file
+              echo "📦 Creating unified log file..."
+              cat $LOG_DIR/*.log > $LOG_DIR/llm-proxy-unified_${TIMESTAMP}.log
+              
+              # Upload to S3 using rclone
+              echo "☁️  Uploading to S3..."
+              rclone copy $LOG_DIR/llm-proxy-unified_${TIMESTAMP}.log nrp:logs-wetlands/ --config /config/rclone.conf
+              
+              # Also upload individual pod logs for reference
+              rclone copy $LOG_DIR/ nrp:logs-wetlands/${TIMESTAMP}/ --config /config/rclone.conf --exclude "llm-proxy-unified_*"
+              
+              echo "✅ Log backup completed successfully at $(date)"
+              echo "   - Unified log: nrp:logs-wetlands/llm-proxy-unified_${TIMESTAMP}.log"
+              echo "   - Individual logs: nrp:logs-wetlands/${TIMESTAMP}/"
+              
+              # List uploaded files
+              echo ""
+              echo "📋 Uploaded files:"
+              rclone ls nrp:logs-wetlands/ --config /config/rclone.conf | tail -5
+              
+            volumeMounts:
+            - name: rclone-config
+              mountPath: /config
+              readOnly: true
+          volumes:
+          - name: rclone-config
+            secret:
+              secretName: rclone-config
+---
+# Optional: Create a one-time Job to test the backup immediately
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: llm-proxy-log-backup-manual
+  namespace: biodiversity
+spec:
+  template:
+    spec:
+      serviceAccountName: log-backup
+      restartPolicy: Never
+      containers:
+      - name: log-backup
+        image: alpine:latest
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "🔄 Starting manual log backup at $(date)"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          LOG_DIR=/tmp/logs
+          mkdir -p $LOG_DIR
+          
+          echo "📦 Installing dependencies..."
+          apk add --no-cache curl rclone
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+          
+          echo "🔍 Finding llm-proxy pods..."
+          PODS=$(kubectl get pods -n biodiversity -l app=llm-proxy -o name)
+          
+          if [ -z "$PODS" ]; then
+            echo "⚠️  No llm-proxy pods found"
+            exit 0
+          fi
+          
+          echo "📥 Fetching logs from pods..."
+          for pod in $PODS; do
+            POD_NAME=$(basename $pod)
+            echo "  - Fetching logs from $POD_NAME"
+            kubectl logs -n biodiversity $pod > $LOG_DIR/${POD_NAME}_${TIMESTAMP}.log 2>&1 || true
+          done
+          
+          echo "📦 Creating unified log file..."
+          cat $LOG_DIR/*.log > $LOG_DIR/llm-proxy-unified_${TIMESTAMP}.log
+          
+          echo "☁️  Uploading to S3..."
+          rclone copy $LOG_DIR/llm-proxy-unified_${TIMESTAMP}.log nrp:logs-wetlands/ --config /config/rclone.conf
+          rclone copy $LOG_DIR/ nrp:logs-wetlands/${TIMESTAMP}/ --config /config/rclone.conf --exclude "llm-proxy-unified_*"
+          
+          echo "✅ Log backup completed successfully at $(date)"
+          echo "   - Unified log: nrp:logs-wetlands/llm-proxy-unified_${TIMESTAMP}.log"
+          echo "   - Individual logs: nrp:logs-wetlands/${TIMESTAMP}/"
+          
+          echo ""
+          echo "📋 Uploaded files:"
+          rclone ls nrp:logs-wetlands/ --config /config/rclone.conf | tail -10
+          
+        volumeMounts:
+        - name: rclone-config
+          mountPath: /config
+          readOnly: true
+      volumes:
+      - name: rclone-config
+        secret:
+          secretName: rclone-config

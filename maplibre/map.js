@@ -527,7 +527,7 @@ window.MapController = {
                         (isLineProperty && layerType === 'line')) {
                         window.map.setPaintProperty(layerId, property, value);
                         console.log(`[MapController] Paint property '${property}' set on layer '${layerId}':`, value);
-                        
+
                         // When setting fill-color, also increase opacity to make colors visible
                         // (default opacity is very low for hydrobasins layer)
                         if (property === 'fill-color' && layerType === 'fill') {
@@ -690,7 +690,7 @@ map.on('load', function () {
         map.addSource('wetlands-cog', {
             'type': 'raster',
             'tiles': [
-                `https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-wetlands/GLWD_v2_0/GLWD_v2_0_combined_classes/GLWD_v2_0_main_class.tif&colormap=${wetlandColormap}`
+                `https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://s3-west.nrp-nautilus.io/public-wetlands/GLWD_v2_0/GLWD_v2_0_combined_classes/GLWD_v2_0_main_class.tif&colormap=${wetlandColormap}`
             ],
             'tileSize': 256,
             'minzoom': 0,
@@ -713,7 +713,7 @@ map.on('load', function () {
         map.addSource('ncp-cog', {
             'type': 'raster',
             'tiles': [
-                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-ncp/NCP_biod_nathab_cog.tif&rescale=0,19&colormap_name=viridis'
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://s3-west.nrp-nautilus.io/public-ncp/NCP_biod_nathab_cog.tif&rescale=0,19&colormap_name=viridis'
             ],
             'tileSize': 256,
             'minzoom': 0,
@@ -739,7 +739,7 @@ map.on('load', function () {
         map.addSource('carbon-cog', {
             'type': 'raster',
             'tiles': [
-                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-carbon/cogs/vulnerable_c_total_2018.tif&colormap_name=reds'
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://s3-west.nrp-nautilus.io/public-carbon/cogs/vulnerable_c_total_2018.tif&colormap_name=reds'
             ],
             'tileSize': 256,
             'minzoom': 0,
@@ -764,7 +764,7 @@ map.on('load', function () {
         // Add Ramsar sites PMTiles layer
         map.addSource('ramsar-source', {
             'type': 'vector',
-            'url': 'pmtiles://https://minio.carlboettiger.info/public-wetlands/ramsar/ramsar_wetlands.pmtiles',
+            'url': 'pmtiles://https://s3-west.nrp-nautilus.io/public-wetlands/ramsar/ramsar_wetlands.pmtiles',
             'attribution': '<a href="https://rsis.ramsar.org/" target="_blank">Ramsar Sites Information Service</a>'
         });
 
@@ -1046,7 +1046,7 @@ function switchBaseLayer(styleName) {
         map.addSource('wetlands-cog', {
             'type': 'raster',
             'tiles': [
-                `https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-wetlands/GLWD_v2_0/GLWD_v2_0_combined_classes/GLWD_v2_0_main_class.tif&colormap=${wetlandColormap}`
+                `https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://s3-west.nrp-nautilus.io/public-wetlands/GLWD_v2_0/GLWD_v2_0_combined_classes/GLWD_v2_0_main_class.tif&colormap=${wetlandColormap}`
             ],
             'tileSize': 256,
             'minzoom': 0,
@@ -1072,7 +1072,7 @@ function switchBaseLayer(styleName) {
         map.addSource('ncp-cog', {
             'type': 'raster',
             'tiles': [
-                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-ncp/NCP_biod_nathab_cog.tif&rescale=0,19&colormap_name=viridis'
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://s3-west.nrp-nautilus.io/public-ncp/NCP_biod_nathab_cog.tif&rescale=0,19&colormap_name=viridis'
             ],
             'tileSize': 256,
             'minzoom': 0,
@@ -1098,7 +1098,7 @@ function switchBaseLayer(styleName) {
         map.addSource('carbon-cog', {
             'type': 'raster',
             'tiles': [
-                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://minio.carlboettiger.info/public-carbon/cogs/vulnerable_c_total_2018.tif&colormap_name=reds'
+                'https://titiler.nrp-nautilus.io/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=https://s3-west.nrp-nautilus.io/public-carbon/cogs/vulnerable_c_total_2018.tif&colormap_name=reds'
             ],
             'tileSize': 256,
             'minzoom': 0,
@@ -1123,7 +1123,7 @@ function switchBaseLayer(styleName) {
         // Re-add Ramsar layer
         map.addSource('ramsar-source', {
             'type': 'vector',
-            'url': 'pmtiles://https://minio.carlboettiger.info/public-wetlands/ramsar/ramsar_wetlands.pmtiles',
+            'url': 'pmtiles://https://s3-west.nrp-nautilus.io/public-wetlands/ramsar/ramsar_wetlands.pmtiles',
             'attribution': '<a href="https://rsis.ramsar.org/" target="_blank">Ramsar Sites Information Service</a>'
         });
 

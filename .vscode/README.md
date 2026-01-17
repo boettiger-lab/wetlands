@@ -56,8 +56,8 @@ All queries run on the remote MCP server with access to:
 - **Global Wetlands**: `s3://public-wetlands/glwd/hex/**`
 - **Vulnerable Carbon**: `s3://public-carbon/hex/vulnerable-carbon/**`
 - **Country Polygons**: `s3://public-overturemaps/hex/countries.parquet`
-- **USA Species Richness**: `https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`
-- **USA Social Vulnerability**: `https://minio.carlboettiger.info/public-social-vulnerability/2022-tracts-h3-z8.parquet`
+- **USA Species Richness**: `https://s3-west.nrp-nautilus.io/public-mobi/hex/all-richness-h8.parquet`
+- **USA Social Vulnerability**: `https://s3-west.nrp-nautilus.io/public-social-vulnerability/2022-tracts-h3-z8.parquet`
 
 ## Why Remote MCP Server?
 

@@ -6,7 +6,7 @@
 ```{r}
 library(duckdbfs)
 library(dplyr)
-duckdb_secrets(key="", secret="", endpoint = "minio.carlboettiger.info")
+duckdb_secrets(key="", secret="", endpoint = "s3-west.nrp-nautilus.io")
 
 glwd <- open_dataset("s3://public-wetlands/glwd/hex/**")
 glwd_code <- open_dataset("s3://public-wetlands/glwd/category_codes.csv", format = "csv", recursive = FALSE) |> rename(wetland_type = "name")

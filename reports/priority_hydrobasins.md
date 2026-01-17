@@ -99,7 +99,7 @@ library(patchwork)
 duckdb_secrets(
     key = "",
     secret = "",
-    endpoint = "minio.carlboettiger.info"
+    endpoint = "s3-west.nrp-nautilus.io"
 )
 ```
 

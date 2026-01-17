@@ -19,13 +19,6 @@ spec:
       labels:
         app: mcp-server
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: stratus1.nrp-espm.berkeley.edu
-      tolerations:
-      - key: "nautilus.io/issue"
-        operator: "Equal"
-        value: "1476"
-        effect: "NoSchedule"
       containers:
       # Nginx sidecar to add CORS headers
       - name: nginx-cors-proxy
@@ -79,6 +72,12 @@ spec:
           name: mcp-nginx-cors-config
       - name: temp-storage
         emptyDir: {}
+      
+      tolerations:
+      - key: "nautilus.io/issue"
+        operator: "Equal"
+        value: "1476"
+        effect: "NoSchedule"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -128,15 +127,4 @@ data:
             }
         }
     }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp-server
-spec:
-  selector:
-    app: mcp-server
-  ports:
-    - protocol: TCP
-      port: 8001
-      targetPort: 8080  # Point to nginx sidecar, not MCP server directly
+

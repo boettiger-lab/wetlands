@@ -4,8 +4,12 @@
     position: fixed;
     bottom: 80px;
     right: 20px;
-    width: 400px;
-    max-height: 600px;
+    width: 500px;
+    min-width: 300px;
+    max-width: 1600px;
+    height: 700px;
+    min-height: 300px;
+    max-height: 1200px;
     display: flex;
     flex-direction: column;
     background: rgba(255, 255, 255, 0);
@@ -15,6 +19,8 @@
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     z-index: 1000;
+    resize: both;
+    overflow: hidden;
 }
 
 #chat-header {
@@ -91,7 +97,37 @@
     flex-direction: column;
     gap: 10px;
     min-height: 200px;
-    max-height: 400px;
+}
+
+/* Resize handle for better visibility */
+#chat-resize-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, rgba(100, 100, 100, 0.3) 0%, transparent 50%);
+    border-top-left-radius: 12px;
+    z-index: 10;
+}
+
+#chat-resize-handle:hover {
+    background: linear-gradient(135deg, rgba(100, 100, 100, 0.5) 0%, transparent 50%);
+}
+
+/* Visual indicator for resize capability */
+#chat-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 15px;
+    height: 15px;
+    background: linear-gradient(135deg, transparent 0%, transparent 50%, rgba(100, 100, 100, 0.3) 50%, rgba(100, 100, 100, 0.3) 100%);
+    border-bottom-right-radius: 12px;
+    cursor: nwse-resize;
+    pointer-events: none;
 }
 
 .chat-message {

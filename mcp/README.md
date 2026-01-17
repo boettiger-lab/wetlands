@@ -5,9 +5,9 @@ This directory contains configuration and deployment resources for the MotherDuc
 ## Data Sources
 
 - **Wetlands Data**: `s3://public-wetlands/hex/**` (GeoParquet files)
-- **Species Richness**: `https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet`
-- **Social Vulnerability**: `https://minio.carlboettiger.info/public-social-vulnerability/2022-tracts-h3-z8.parquet`
-- **S3 Endpoint**: `minio.carlboettiger.info` (custom MinIO endpoint)
+- **Species Richness**: `https://s3-west.nrp-nautilus.io/public-mobi/hex/all-richness-h8.parquet`
+- **Social Vulnerability**: `https://s3-west.nrp-nautilus.io/public-social-vulnerability/2022-tracts-h3-z8.parquet`
+- **S3 Endpoint**: `s3-west.nrp-nautilus.io` (custom MinIO endpoint)
 
 ## MCP Server Deployment
 
@@ -108,7 +108,7 @@ Browser → https://boettiger-lab.github.io/wetlands (frontend)
 -- Set up the custom S3 endpoint
 CREATE OR REPLACE SECRET s3 (
     TYPE S3,
-    ENDPOINT 'minio.carlboettiger.info',
+    ENDPOINT 's3-west.nrp-nautilus.io',
     URL_STYLE 'path'
 );
 
@@ -120,7 +120,7 @@ SELECT
     w.*,
     s.richness
 FROM read_parquet('s3://public-wetlands/hex/**') w
-JOIN read_parquet('https://minio.carlboettiger.info/public-mobi/hex/all-richness-h8.parquet') s
+JOIN read_parquet('https://s3-west.nrp-nautilus.io/public-mobi/hex/all-richness-h8.parquet') s
 ON w.h8 = s.h8
 LIMIT 10;
 ```

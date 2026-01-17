@@ -297,14 +297,14 @@ The iNaturalist dataset only has h0-h4 columns, while wetlands data has h8. This
 SET THREADS=100;
 SET preserve_insertion_order=false;
 SET enable_object_cache=true;
-SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
 INSTALL h3 FROM community; LOAD h3;
 CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
     URL_STYLE 'path', USE_SSL 'false', KEY_ID '', SECRET '');
 CREATE OR REPLACE SECRET outputs (
-    TYPE S3, ENDPOINT 'minio.carlboettiger.info',
-    URL_STYLE 'path', SCOPE 's3://public-outputs'
+    TYPE S3, ENDPOINT 's3-west.nrp-nautilus.io',
+    URL_STYLE 'path', SCOPE 's3://public-output',
+    KEY_ID '', SECRET ''
 );
 
 -- Query bird species in forested wetlands in Costa Rica and output as CSV
@@ -327,17 +327,17 @@ COPY (
   AND t.class = 'Aves'  -- Birds only
   AND pos.rank = 'species'
   GROUP BY t.scientificName, t.vernacularName, t.family, t.order
-) TO 's3://public-outputs/wetlands/cr_forested_wetland_birds.csv'
+) TO 's3://public-output/wetlands/cr_forested_wetland_birds.csv'
 (FORMAT CSV, HEADER, OVERWRITE_OR_IGNORE);
 ```
 
-Then provide the user with download link: `https://minio.carlboettiger.info/public-outputs/wetlands/cr_forested_wetland_birds.csv`
+Then provide the user with download link: `https://s3-west.nrp-nautilus.io/public-output/wetlands/cr_forested_wetland_birds.csv`
 
 **Key Points:**
 - Use `h3_cell_to_parent(w.h8, 4)` to convert h8 hexagons to their h4 parents
 - The target resolution (4 in this case) must match the resolution in the coarser dataset
 - Join the taxonomy table to filter by taxonomic class (birds = "Aves") and get scientific/common names
-- Use the `COPY ... TO` syntax to output results as CSV to the public-outputs bucket
+- Use the `COPY ... TO` syntax to output results as CSV to the public-output bucket
 - Multiple h8 hexagons will map to the same h4 parent, which is expected behavior
 - For large datasets like iNaturalist, filter by country first to avoid memory issues
 
@@ -371,8 +371,6 @@ SET THREADS=100;
 SET preserve_insertion_order=false;
 -- Cache S3 metadata to speed up repeated queries
 SET enable_object_cache=true;
--- Use local disk for temp storage if memory is exceeded
-SET temp_directory='/tmp';
 
 -- Install and load httpfs extension for S3 access
 INSTALL httpfs;
@@ -392,9 +390,11 @@ CREATE OR REPLACE SECRET s3 (
 -- ALSO configure S3 connection to with write access to provide CSV outputs. 
 CREATE OR REPLACE SECRET outputs (
     TYPE S3,
-    ENDPOINT 'minio.carlboettiger.info',
+    ENDPOINT 's3-west.nrp-nautilus.io',
     URL_STYLE 'path',
-    SCOPE 's3://public-outputs'
+    SCOPE 's3://public-output',
+    KEY_ID '',
+    SECRET ''
 );
 ```
 
@@ -403,25 +403,25 @@ CREATE OR REPLACE SECRET outputs (
 - `SET THREADS=100` - Enables parallel S3 reads (I/O bound, not CPU bound)
 - `SET preserve_insertion_order=false` - Allows faster parallel aggregation
 - `SET enable_object_cache=true` - Reduces S3 metadata requests
-- `SET temp_directory='/tmp'` - Uses fast local disk for spillover
 - `INSTALL/LOAD httpfs` - Required for S3/HTTP access to remote parquet files
+- Temp directory: DuckDB will use the `TMPDIR` environment variable if set, or system default otherwise
 - `USE_SSL 'false'` - Must be USE_SSL (with underscore, not a space!)
 - `CREATE SECRET s3` - Configures connection to the MinIO S3-compatible storage
 - `KEY_ID`, `SECRET` are empty string by default, which tells duckdb to use anonymous access to data on `rook-ceph-rgw-nautiluss3.rook`
 
 **Generating Output data:**
 When results cannot be easily summarized or the user specifically asks for it, 
-you can provide the user output data as a CSV file by writing to "public-outputs"
+you can provide the user output data as a CSV file by writing to "public-output"
 bucket and then sharing the corresponding public URL with the user.
 For instance, if you write a table like
 
 ```sql
 COPY (SELECT * FROM ...)
-TO 's3://public-outputs/wetlands/example-2025-01-01T10:10:10.csv'
+TO 's3://public-output/wetlands/example-2025-01-01T10:10:10.csv'
 (FORMAT CSV, HEADER, OVERWRITE_OR_IGNORE);
 ```
 
-then direct the user to download this data at `https://minio.carlboettiger.info/public-outputs/wetlands/example-2025-01-01T10:10:10.csv` .  
+then direct the user to download this data at `https://s3-west.nrp-nautilus.io/public-output/wetlands/example-2025-01-01T10:10:10.csv` .  
 
 
 ## Best Practices
@@ -541,14 +541,15 @@ These optimizations typically provide **5-20x speedup** by:
 SET THREADS=100;
 SET preserve_insertion_order=false;
 SET enable_object_cache=true;
-SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
 INSTALL h3 FROM community; LOAD h3;
 CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
     URL_STYLE 'path', USE_SSL 'false', KEY_ID '', SECRET '');
 CREATE OR REPLACE SECRET outputs (
-    TYPE S3, ENDPOINT 'minio.carlboettiger.info',
-    URL_STYLE 'path', SCOPE 's3://public-outputs'
+    TYPE S3, ENDPOINT 's3-west.nrp-nautilus.io',
+    URL_STYLE 'path', SCOPE 's3://public-output',
+    KEY_ID '',
+    SECRET ''
 );
 
 -- Query
@@ -565,14 +566,15 @@ WHERE w.Z > 0 GROUP BY c.category ORDER BY area_hectares DESC;
 SET THREADS=100;
 SET preserve_insertion_order=false;
 SET enable_object_cache=true;
-SET temp_directory='/tmp';
 INSTALL httpfs; LOAD httpfs;
 INSTALL h3 FROM community; LOAD h3;
 CREATE OR REPLACE SECRET s3 (TYPE S3, ENDPOINT 'rook-ceph-rgw-nautiluss3.rook', 
     URL_STYLE 'path', USE_SSL 'false', KEY_ID '', SECRET '');
 CREATE OR REPLACE SECRET outputs (
-    TYPE S3, ENDPOINT 'minio.carlboettiger.info',
-    URL_STYLE 'path', SCOPE 's3://public-outputs'
+    TYPE S3, ENDPOINT 's3-west.nrp-nautilus.io',
+    URL_STYLE 'path', SCOPE 's3://public-output',
+    KEY_ID '',
+    SECRET ''
 );
 
 -- Query
@@ -599,12 +601,11 @@ WHERE ctry.country = 'IN' GROUP BY c.name ORDER BY total_carbon DESC;
 2. **ONE COMPLETE QUERY PER QUESTION** - Answer each user question with EXACTLY ONE tool call containing a complete SQL query (including all setup commands in the same query). The setup commands and the SELECT/COPY statement should ALL be in a single query string passed to the tool.
 
 3. **INCLUDE SETUP IN EVERY QUERY** - Every query must include the standard setup commands at the beginning:
-   SET preserve_insertion_order=false;
    ```sql
    SET THREADS=100;
    SET preserve_insertion_order=false;
    SET enable_object_cache=true;
-   SET temp_directory='/tmp' LOAD httpfs;
+   INSTALL httpfs; LOAD httpfs;
    INSTALL h3 FROM community; LOAD h3;
    CREATE OR REPLACE SECRET s3 (...);
    CREATE OR REPLACE SECRET outputs (...);
