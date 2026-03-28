@@ -52,9 +52,9 @@ def load_config() -> dict:
                 }
             },
             "nimbus": {
-                "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
+                "endpoint": "https://vllm-nimbus.carlboettiger.info/v1/chat/completions",
                 "api_key_env": "NIMBUS_API_KEY",
-                "models": ["cirrus"]
+                "models": ["nemotron"]
             }
         }
     }
