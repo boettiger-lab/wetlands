@@ -7,7 +7,7 @@
 // - Validates tool call arguments and LLM responses for empty content
 // - Provides user-friendly error messages for common failure scenarios
 
-// Import MCP SDK for proper SSE communication
+// Import MCP SDK for SSE communication
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 

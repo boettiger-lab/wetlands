@@ -35,7 +35,7 @@ This directory contains the Kubernetes deployment configuration for the hosted L
 
 - `llm_proxy.py` - FastAPI application that proxies LLM requests (also in configmap.yaml)
 - `analyze_logs.py` - Script to analyze LLM usage patterns from logs
-- `configmap.yaml` - ConfigMap containing the application code
+- `analyze_logs.py` - Script to analyze LLM usage patterns from logs
 - `deployment.yaml` - Kubernetes Deployment configuration
 - `service.yaml` - Kubernetes Service configuration
 - `ingress.yaml` - Kubernetes Ingress with CORS configuration
@@ -295,18 +295,26 @@ python llm_proxy/analyze_logs.py logs/llm-proxy-unified_20260107_190859.log
 
 ## Updating
 
-To update the deployment after changing the code:
+## Updating
 
-```bash
-# Update the configmap with new code
-kubectl apply -f llm_proxy/configmap.yaml
+The deployment uses a git-sync init container to fetch the code and configuration. To update the deployment:
 
-# Restart the deployment to pick up changes
-kubectl rollout restart deployment/llm-proxy
+1.  **Commit and Push**: Commit your changes (including `config.json`) and push to the `main` branch on GitHub.
+    ```bash
+    git add .
+    git commit -m "Update configuration"
+    git push origin main
+    ```
 
-# Watch the rollout status
-kubectl rollout status deployment/llm-proxy
-```
+2.  **Restart Deployment**: Restart the deployment to trigger the init container to re-clone the repository.
+    ```bash
+    kubectl rollout restart deployment/llm-proxy
+    ```
+
+3.  **Watch Rollout**:
+    ```bash
+    kubectl rollout status deployment/llm-proxy
+    ```
 
 ## Related Documentation
 

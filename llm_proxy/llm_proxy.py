@@ -22,13 +22,8 @@ app = FastAPI(title="Multi-Provider LLM Proxy for Wetlands Chatbot")
 # Enable CORS - allow requests from GitHub Pages and k8s deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://cboettig.github.io",
-        "https://boettiger-lab.github.io",
-        "https://wetlands.nrp-nautilus.io",  # K8s deployment
-        "https://nature.nrp-nautilus.io",  # K8s deployment
-        "http://localhost:8000",  # For local testing
-    ],
+    allow_origins=[],
+    allow_origin_regex=r"https://.*\.nrp-nautilus\.io",
     allow_credentials=True,  # Required for Authorization header
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],  # Allow all headers to prevent preflight failures
@@ -57,9 +52,9 @@ def load_config() -> dict:
                 }
             },
             "nimbus": {
-                "endpoint": "https://vllm-cirrus.carlboettiger.info/v1/chat/completions",
+                "endpoint": "https://vllm-nimbus.carlboettiger.info/v1/chat/completions",
                 "api_key_env": "NIMBUS_API_KEY",
-                "models": ["cirrus"]
+                "models": ["nemotron"]
             }
         }
     }
@@ -124,13 +119,14 @@ def get_provider_for_model(model: str) -> tuple[str, dict]:
     print(f"⚠️  Unknown model '{model}', defaulting to NRP")
     return "nrp", PROVIDERS["nrp"]
 
-def log_request(provider: str, model: str, messages: List[Dict], tools_count: int = 0):
+def log_request(provider: str, model: str, messages: List[Dict], tools_count: int = 0, origin: str = None):
     """Log incoming request in structured JSON format"""
     log_entry = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "type": "request",
         "provider": provider,
         "model": model,
+        "origin": origin,
         "message_count": len(messages),
         "tools_count": tools_count,
         "user_message": messages[-1].get("content", "")[:200] if messages else ""  # Last message preview
@@ -177,7 +173,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/v1/chat/completions")
 @app.post("/chat")  # Keep for backward compatibility
-async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header(None)):
+async def proxy_chat(request: ChatRequest, http_request: Request, authorization: Optional[str] = Header(None)):
     """
     Multi-provider proxy for chat completions
     Routes requests to appropriate provider based on model name
@@ -208,7 +204,8 @@ async def proxy_chat(request: ChatRequest, authorization: Optional[str] = Header
         raise HTTPException(status_code=500, detail=error_msg)
     
     # Log incoming request
-    log_request(provider_name, request.model, request.messages, len(request.tools or []))
+    origin = http_request.headers.get("origin") or http_request.headers.get("referer")
+    log_request(provider_name, request.model, request.messages, len(request.tools or []), origin=origin)
     
     # Prepare request to LLM provider
     headers = {
