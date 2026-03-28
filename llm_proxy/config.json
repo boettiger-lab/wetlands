@@ -6,7 +6,9 @@
             "models": [
                 "kimi",
                 "qwen3",
-                "glm-4.6"
+                "glm-4.7",
+                "minimax-m2",
+                "gpt-oss"
             ]
         },
         "openrouter": {
@@ -17,7 +19,8 @@
                 "mistralai/",
                 "amazon/",
                 "openai/",
-                "qwen/"
+                "qwen/",
+                "nvidia/"
             ],
             "extra_headers": {
                 "HTTP-Referer": "https://wetlands.nrp-nautilus.io",

@@ -3,20 +3,24 @@
 Analyze LLM Proxy logs to extract query statistics and model usage patterns.
 
 Usage:
-    python analyze_logs.py [log_file_path]
-    
-If no log file is provided, uses the most recent unified log in the logs/ directory.
+    python analyze_logs.py --days 7     # Analyze logs from the past 7 days
+    python analyze_logs.py <log_file>   # Analyze a specific log file
 """
 
 import json
 import re
 import sys
+import subprocess
+import tempfile
 from collections import defaultdict, Counter
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+import argparse
 
 
 def parse_log_file(log_path):
+    """Parse a log file and extract request/response data, removing duplicates."""
+
     """Parse a log file and extract request/response data, removing duplicates."""
     requests = []
     responses = []
@@ -268,24 +272,87 @@ def print_summary(request_analysis, response_analysis, temporal_analysis):
     print("\n" + "="*70)
 
 
+
+def download_logs_from_s3(days: int) -> Path:
+    """Download logs from S3 and return path to combined log file."""
+    # Calculate date range
+    today = datetime.now()
+    start_date = today - timedelta(days=days)
+    
+    print(f"📥 Downloading logs from the past {days} days...")
+    
+    # Create temp directory for downloads
+    logs_dir = Path(__file__).parent.parent / 'logs'
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Download from S3
+    result = subprocess.run(
+        ['rclone', 'copy', 'nrp:logs-wetlands/', str(logs_dir)],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(f"❌ rclone failed: {result.stderr}")
+        sys.exit(1)
+    
+    # Filter unified logs by date in filename
+    combined_content = []
+    for log_file in sorted(logs_dir.glob('llm-proxy-unified_*.log')):
+        # Extract date from filename: llm-proxy-unified_YYYYMMDD_HHMMSS.log
+        try:
+            date_str = log_file.name.split('_')[1]
+            file_date = datetime.strptime(date_str, '%Y%m%d')
+            if file_date >= start_date:
+                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    combined_content.append(f.read())
+        except (IndexError, ValueError):
+            continue
+    
+    if not combined_content:
+        print(f"❌ No logs found for the past {days} days")
+        sys.exit(1)
+    
+    # Write combined file
+    combined_path = logs_dir / f'combined_{days}days.log'
+    with open(combined_path, 'w') as f:
+        f.write('\n'.join(combined_content))
+    
+    print(f"✓ Combined {len(combined_content)} log files")
+    return combined_path
+
+
 def main():
-    # Determine log file to analyze
-    if len(sys.argv) > 1:
-        log_path = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description='Analyze LLM Proxy logs for query statistics and usage patterns.'
+    )
+    parser.add_argument(
+        '--days', '-d', type=int, default=None,
+        help='Analyze logs from the past N days (downloads from S3 automatically)'
+    )
+    parser.add_argument(
+        'log_file', nargs='?', default=None,
+        help='Path to a specific log file to analyze'
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine log source
+    if args.days:
+        log_path = download_logs_from_s3(args.days)
+    elif args.log_file:
+        log_path = Path(args.log_file)
+        if not log_path.exists():
+            print(f"❌ Log file not found: {log_path}")
+            sys.exit(1)
     else:
-        # Find most recent unified log
+        # Default: find most recent local log
         logs_dir = Path(__file__).parent.parent / 'logs'
         unified_logs = list(logs_dir.glob('llm-proxy-unified_*.log'))
         if not unified_logs:
-            print("❌ No unified log files found. Please provide a log file path.")
+            print("❌ No logs found. Use --days N to download from S3.")
             sys.exit(1)
         log_path = max(unified_logs, key=lambda p: p.stat().st_mtime)
     
-    if not log_path.exists():
-        print(f"❌ Log file not found: {log_path}")
-        sys.exit(1)
-    
-    print(f"📖 Analyzing log file: {log_path}")
+    print(f"📖 Analyzing: {log_path}")
     
     # Parse and analyze
     requests, responses = parse_log_file(log_path)
@@ -298,7 +365,6 @@ def main():
     response_analysis = analyze_responses(responses)
     temporal_analysis = analyze_temporal_patterns(requests)
     
-    # Print summary
     print_summary(request_analysis, response_analysis, temporal_analysis)
 
 

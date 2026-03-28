@@ -60,23 +60,17 @@ logs-wetlands/
     └── ...
 ```
 
-## Analyzing Backups
+## Viewing Query History
 
-Download and analyze logs from S3:
+To see all queries to the chatbot:
 
 ```bash
-# List available logs
-rclone ls nrp:logs-wetlands/
+# Analyze logs from the past 7 days
+python llm_proxy/analyze_logs.py --days 7
 
-# Download a specific unified log
-rclone copy nrp:logs-wetlands/llm-proxy-unified_20260107_020000.log logs/
-
-# Download all logs
-rclone copy nrp:logs-wetlands/ logs/s3-backups/
-
-# Analyze
-python llm_proxy/analyze_logs.py logs/llm-proxy-unified_20260107_020000.log
 ```
+
+This automatically downloads logs from S3 and generates a usage report.
 
 ## Configuration
 
